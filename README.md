@@ -9,7 +9,7 @@ agent's claim of success.
 
 | Task | Objective | Status |
 |---|---|---|
-| [`aws/create-s3-bucket`](tasks/aws/create-s3-bucket/instruction.md) | Create one named S3 bucket using the Python AWS SDK | Minimal runner-integration smoke test |
+| [`aws/create-s3-bucket`](tasks/aws/create-s3-bucket/instruction.md) | Create one named S3 bucket using the Python AWS SDK | Oracle **1**, nop **0** verified on Harbor 0.21.0 |
 | [`aws/create-secure-s3-bucket`](tasks/aws/create-secure-s3-bucket/instruction.md) | Use Terraform to create a private, encrypted, versioned bucket | Blocked scaffold; deliberately not runnable yet |
 
 The first task deliberately has just **one requirement**: `cloudopsbench-smoke` exists.
@@ -27,7 +27,8 @@ Task instruction → agent → emulator APIs → resulting cloud state → verif
 - **No valid reward:** verifier/setup error, reported separately.
 
 For the smoke task, the reference solution creates the bucket; the verifier independently
-lists buckets. The oracle should pass and a no-op agent should fail on fresh emulators.
+lists buckets. The oracle passed and the no-op agent failed as expected on fresh emulators; see the
+[recorded smoke evidence](docs/smoke-test.md#executed-smoke-evidence).
 Emulator-support issue tracking is a separate runner concern and never rewrites rewards.
 
 ## Public content and private execution

@@ -36,6 +36,22 @@ Run the oracle twice on fresh emulators to check reset/lifecycle behavior. Check
 and isolation before increasing concurrency or running a model. The task is not meant to
 run directly through bare Harbor without the runner-injected emulator.
 
+## Executed smoke evidence
+
+Tested on **2026-09-17**, on the private runner with Harbor **0.21.0**:
+
+- Task commit: `35f3333b92d54fb0867828b8e0b7ec5bd9a78469`.
+- Emulator digest: `sha256:ccd587b81c3b54fa4f01aa0bd6b97f9f3df1d9e3c992c9461d27317eb0588a0a`.
+- Oracle (`-k 1 -n 1`): **1/1 passed**, no evaluation errors.
+- Nop (`-k 1 -n 1`): **0/1 passed**, reward **0**, no evaluation errors.
+- Repeated oracle (`-k 2 -n 2`): **2/2 passed**, no evaluation errors.
+- Harbor's trial containers were removed after completion. An unrelated manually started
+  emulator smoke container was left untouched.
+
+All tests used `--no-upload`. Artifacts remain on the private runner; these are pipeline
+checks, not model leaderboard results. The concurrent test checks basic execution of two
+fresh trials, not adversarial cross-trial access.
+
 ## Remaining gates
 
 A real model run, separate trusted verifier, adversarial egress/tampering tests, provider

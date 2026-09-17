@@ -25,7 +25,7 @@ Always report task-set revision, denominator, exclusions, infrastructure errors,
 - Use bounded retries only for documented readiness/consistency behavior, not arbitrary sleeps or indefinite polling.
 - Preserve diagnostic evidence; never log credentials.
 
-The S3 example checks existence, enabled versioning, all four public-access blocks, default SSE configuration, and the required tag through normal S3 API concepts. Configuration errors currently exit `2`; assertion failures exit `1`; successful checks exit `0`. The shell emits a conservative zero reward on errors. This is fail-closed output, **not proof that infrastructure errors are ordinary task failures**. Harbor's collected errors and verifier logs must be reviewed before aggregation.
+The S3 example checks existence, enabled versioning, all four public-access blocks, default SSE configuration, and the required tag through normal S3 API concepts. Configuration errors currently exit `2`; assertion failures exit `1`; successful checks exit `0`. The shell writes no reward on evaluation errors; Harbor's collected errors and verifier logs must be reviewed before aggregation.
 
 ## Verifier isolation
 

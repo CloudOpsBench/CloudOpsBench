@@ -7,8 +7,11 @@ No release dates are assigned. Checked items exist in this repository; unchecked
 - [x] Minimal repository and community templates; MIT license.
 - [x] Architecture, preliminary task specification, and contributor documentation.
 - [x] One Harbor-format S3 scaffold with reference resources and semantic checks.
-- [ ] Pin a tested Harbor release and validate schema, CLI, and Docker behavior end-to-end.
-- [ ] Complete emulator integration for the single S3 task before adding tasks.
+- [x] Validate the minimal SDK S3 task end-to-end on Harbor 0.21.0: oracle 1, nop 0, two concurrent oracle passes; see [evidence](smoke-test.md#executed-smoke-evidence).
+- [ ] Complete the separate secure-bucket Terraform task integration.
+
+The TODO inventory below concerns full benchmark readiness, not whether the SDK smoke
+path can execute. Smoke success does not close adversarial isolation or fidelity gates.
 
 ### Emulator integration TODO inventory
 
