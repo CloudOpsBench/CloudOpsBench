@@ -1,0 +1,33 @@
+# Local secrets and cloud configuration
+.env
+.env.*
+!.env.example
+.aws/
+.azure/
+.config/gcloud/
+*.pem
+*.key
+
+# Terraform/OpenTofu generated state and local caches
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+# Commit .terraform.lock.hcl once provider versions are selected.
+
+# Harbor run output
+jobs/
+logs/
+
+# Python and editor/OS files
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.DS_Store
+.idea/
+.vscode/
