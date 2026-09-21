@@ -9,11 +9,17 @@ agent's claim of success.
 
 | Task | Objective | Status |
 |---|---|---|
-| [`aws/create-s3-bucket`](tasks/aws/create-s3-bucket/instruction.md) | Create one named S3 bucket using the Python AWS SDK | Oracle **1**, nop **0** verified on Harbor 0.21.0 |
-| [`aws/create-secure-s3-bucket`](tasks/aws/create-secure-s3-bucket/instruction.md) | Use Terraform to create a private, encrypted, versioned bucket | Blocked scaffold; deliberately not runnable yet |
+| [`aws/tighten-sqs-redrive-allow-policy`](tasks/aws/tighten-sqs-redrive-allow-policy/instruction.md) | Tighten a dead-letter queue's redrive-allow policy to least privilege (Terraform) | Experimental |
+| [`aws/promote-lambda-live-alias`](tasks/aws/promote-lambda-live-alias/instruction.md) | Publish a new Lambda build and cut the `live` alias over to it (Terraform) | Experimental |
+| [`aws/tighten-kinesis-resource-policy`](tasks/aws/tighten-kinesis-resource-policy/instruction.md) | Tighten a Kinesis stream's resource policy to least privilege (Terraform) | Experimental |
+| [`aws/decommission-analytics-environment`](tasks/aws/decommission-analytics-environment/instruction.md) | Fully remove a prefixed analytics environment and nothing else | Experimental |
+| [`aws/decommission-data-pipeline`](tasks/aws/decommission-data-pipeline/instruction.md) | Fully remove a prefixed data pipeline and nothing else | Experimental |
+| [`aws/decommission-event-workload`](tasks/aws/decommission-event-workload/instruction.md) | Fully remove a prefixed event-driven workload and nothing else | Experimental |
 
-The first task deliberately has just **one requirement**: `cloudopsbench-smoke` exists.
-It is a pipeline check, not a challenging benchmark or a claim of broad emulator fidelity.
+Every task starts from existing infrastructure: the task container seeds its starting cloud
+state into the trial's fresh emulator before the agent is let in (see
+[seeded tasks](docs/seeded-tasks.md)). Oracle **1** / nop **0** were checked against the
+emulator outside Harbor; runs through the operator runner are still pending.
 No model evaluations or leaderboard results have been published.
 
 ## How grading works
@@ -26,8 +32,8 @@ Task instruction → agent → emulator APIs → resulting cloud state → verif
 - **0:** required state does not exist.
 - **No valid reward:** verifier/setup error, reported separately.
 
-For the smoke task, the reference solution creates the bucket; the verifier independently
-lists buckets. The oracle passed and the no-op agent failed as expected on fresh emulators; see the
+Reference solutions change the cloud; verifiers independently read it back. The pipeline
+itself was first proven with a since-retired S3 smoke task; see the
 [recorded smoke evidence](docs/smoke-test.md#executed-smoke-evidence).
 Emulator-support issue tracking is a separate runner concern and never rewrites rewards.
 
@@ -49,11 +55,10 @@ is used for trusted oracle/nop tests; untrusted model grading still needs isolat
 ## Repository layout
 
 ```text
-tasks/aws/create-s3-bucket/         Minimal SDK smoke task
-tasks/aws/create-secure-s3-bucket/  Blocked Terraform example
-docs/                              Task conventions, evaluation, roadmap
-scripts/validate.py                 Dependency-free static checks
-.github/                           Contribution templates
+tasks/aws/<task>/        One Harbor task per directory (see the table above)
+docs/                    Task conventions, evaluation, roadmap
+scripts/validate.py      Dependency-free static checks
+.github/                 Contribution templates
 ```
 
 Run static checks with Python 3.11+:

@@ -1,0 +1,42 @@
+schema_version = "1.4"
+
+[task]
+name = "cloudopsbench/aws-promote-lambda-live-alias"
+description = "Publish a new Lambda build and cut the live alias over to it."
+keywords = ["aws", "terraform", "lambda", "sqs", "deployment"]
+
+# CloudOpsBench conventions; status is NOT an execution gate in Harbor.
+[metadata]
+id = "aws/promote-lambda-live-alias"
+provider = "aws"
+category = "compute"
+difficulty = "hard"
+status = "experimental"
+source = "aws_task12_lambda_alias_promote_854ba5d9"
+
+[agent]
+timeout_sec = 1800.0
+user = "agent"
+
+[verifier]
+timeout_sec = 600.0
+user = "root"
+# Shared-container grading is not claimed tamper-proof.
+environment_mode = "shared"
+
+[environment]
+build_timeout_sec = 900.0
+cpus = 2
+memory_mb = 4096
+storage_mb = 10240
+# The runner supplies a fresh emulator and phase-scoped model-provider egress.
+network_mode = "no-network"
+
+# The entrypoint seeds the starting cloud state; the agent starts only once it is in place.
+[environment.healthcheck]
+command = "test -f /run/cloudopsbench/ready"
+interval_sec = 5.0
+timeout_sec = 10.0
+start_period_sec = 600.0
+start_interval_sec = 2.0
+retries = 3

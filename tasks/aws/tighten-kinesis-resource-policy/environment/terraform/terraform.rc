@@ -1,0 +1,8 @@
+disable_checkpoint = true
+provider_installation {
+  filesystem_mirror {
+    path    = "/opt/terraform-provider-mirror"
+    include = ["registry.terraform.io/hashicorp/aws"]
+  }
+  # No direct fallback: terraform init must not download providers at runtime.
+}
