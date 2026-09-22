@@ -2,7 +2,8 @@
 
 `aws/create-s3-bucket` is intentionally tiny: create the S3 bucket
 `cloudopsbench-smoke`. There are no tagging, versioning, encryption, or IaC requirements.
-The older `create-secure-s3-bucket` task remains a blocked Terraform scaffold.
+`create-secure-s3-bucket` is the larger Terraform task, with versioning, encryption,
+public-access-block and tag requirements. Its tooling and emulator connection are now implemented.
 
 ## Execution contract
 
@@ -56,5 +57,5 @@ fresh trials, not adversarial cross-trial access.
 
 A real model run, separate trusted verifier, adversarial egress/tampering tests, provider
 API allowlisting, broader emulator semantics, and fully locked image/dependency builds are
-not implied by an oracle/nop smoke pass. The Terraform scaffold has additional independent
-integration TODOs.
+not implied by an oracle/nop smoke pass. The secure Terraform task is also experimental;
+neither task certifies a tamper-proof grader or complete AWS fidelity.

@@ -2,13 +2,15 @@
 
 ## Harbor compatibility
 
-The new [SDK smoke task](smoke-test.md) targets the installed Harbor **0.21.0** release.
-The detailed secure-bucket scaffold conventions below remain applicable to that older,
-blocked Terraform example; its source-only validation is not runtime certification.
+Both S3 tasks target the installed Harbor **0.21.0** release. The secure-bucket task
+uses Terraform and an offline provider mirror; the [SDK smoke task](smoke-test.md) is
+the smaller integration control. Both remain experimental, not certified adversarial benchmarks.
 
 Canonical references: [Harbor task documentation](https://harborframework.com/docs/tasks), [official source documentation](https://github.com/harbor-framework/harbor/blob/96a13544537e54be84c0f316f8c3156769380684/docs/content/docs/tasks/index.mdx), and [configuration model](https://github.com/harbor-framework/harbor/blob/96a13544537e54be84c0f316f8c3156769380684/src/harbor/models/task/config.py).
 
-This scaffold targets upstream revision `96a13544537e54be84c0f316f8c3156769380684`, whose current `schema_version` is `"1.4"`. CLI source and task documentation were inspected directly, and the example TOML passed this revision's official `TaskConfig.model_validate_toml` in a temporary validation environment. This is a source compatibility target, not a certified runtime release or completed execution test. Before release, pin and test an available Harbor version. Use `harbor tasks schema` to inspect the installed schema and `harbor run --help` for its CLI.
+The schema version is `"1.4"`. Initial source inspection used upstream revision
+`96a13544537e54be84c0f316f8c3156769380684`; execution uses Harbor 0.21.0. Use
+`harbor tasks schema` and `harbor run --help` to inspect the installed release.
 
 Do not substitute legacy Terminal-Bench `task.yaml`, `run-tests.sh`, or flat timeout fields. Harbor's current format is:
 
@@ -39,9 +41,9 @@ Do not substitute legacy Terminal-Bench `task.yaml`, `run-tests.sh`, or flat tim
 | Difficulty | CloudOpsBench `metadata.difficulty`, provisional `easy`, `medium`, or `hard` |
 | Status | CloudOpsBench `metadata.status`, example `scaffold`; informational, **not a Harbor execution gate** |
 | Instruction | `instruction.md`: user-facing objective and all scored requirements |
-| Initial state | Document in instruction and implement deterministic environment bootstrap; empty scope for S3, bootstrap TODO |
+| Initial state | Document in instruction and implement deterministic environment bootstrap; fresh per-trial S3 emulator supplied by the runner |
 | Environment | Canonical `[environment]`, plus Docker build definition; workspace chosen through Docker `WORKDIR /workspace` |
-| Allowed tools | Instruction and installed environment; Terraform required, shell permitted, AWS CLI planned for inspection; not a custom Harbor config field |
+| Allowed tools | Instruction and installed environment; Terraform required, shell permitted, AWS CLI installed for inspection; not a custom Harbor config field |
 | Reference solution | `solution/solve.sh` and helpers; Harbor oracle copies these to `/solution` |
 | Verifier | `tests/test.sh` and helpers; shared-mode Harbor copies these to `/tests` |
 | Expected final state | Instruction requirements mapped to semantic assertions in verifier |
@@ -65,7 +67,9 @@ A release-ready task has:
 6. No dependence on real cloud credentials.
 7. Reproducible results, including negative controls.
 
-The example does **not** yet meet this contract: environment, connection, and execution evidence are TODO. Structural validity must never be represented as benchmark readiness.
+Tooling and emulator connections are implemented. Full adversarial isolation, trusted
+grading, and broad fidelity validation remain release gates. Structural validity or an
+oracle pass alone must never be represented as benchmark readiness.
 
 ## S3 scoring contract
 

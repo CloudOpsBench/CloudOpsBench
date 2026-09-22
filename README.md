@@ -52,6 +52,28 @@ The smoke integration targets **Harbor 0.21.0**. See [smoke-test notes](docs/smo
 for the connection contract, execution procedure, and limitations. Shared-container grading
 is used for trusted oracle/nop tests; untrusted model grading still needs isolation review.
 
+## Creating tasks: reference solution convention
+
+Follow the [task creation guide](docs/creating-tasks.md). Keep reference solutions split into:
+
+```text
+solution/
+├── solve.sh     Harbor oracle entrypoint: endpoint guard and dummy credentials
+└── golden.sh    Commands that actually solve the task
+```
+
+`solve.sh` must refuse endpoints other than the trial emulator, configure the dummy
+identity, change to `/workspace`, and invoke `bash /solution/golden.sh`. Keep the actual
+solution logic in `golden.sh` and propagate failures back to Harbor.
+
+This is a valid Harbor layout: `solve.sh` is the standard oracle entrypoint and may call
+helper scripts. The name `golden.sh` and this split are **CloudOpsBench conventions**, not
+Harbor requirements. Neither script belongs in the agent image or workspace.
+
+Reference solutions complete the task; they do not initialize it. Starting state belongs
+in `environment/seed/setup.sh`, run by the container entrypoint before its readiness
+health check passes. See [seeded tasks](docs/seeded-tasks.md).
+
 ## Repository layout
 
 ```text

@@ -13,7 +13,7 @@ For an initial pass@1 estimate, use a fixed attempt policy and configuration. Wi
 
 Each valid trial has a binary reward: `1` only if every required final-state check passes, otherwise `0`. Harbor reads `/logs/verifier/reward.txt` and owns execution, logging, and aggregation. CloudOpsBench supplies task semantics, not a runner.
 
-Always report task-set revision, denominator, exclusions, infrastructure errors, agent/model configuration, attempt policy, timeouts, and tool/emulator/Harbor versions. Agent timeouts count as failures under the published budget. Emulator unavailability, invalid setup, or verifier crashes are evaluation errors: report separately and rerun under a declared policy, never silently omit them to improve scores. The current blocked scaffold is not eligible for scoring.
+Always report task-set revision, denominator, exclusions, infrastructure errors, agent/model configuration, attempt policy, timeouts, and tool/emulator/Harbor versions. Agent timeouts count as failures under the published budget. Emulator unavailability, invalid setup, or verifier crashes are evaluation errors: report separately and rerun under a declared policy, never silently omit them to improve scores. The current tasks are experimental integration tests, not a release-ready leaderboard.
 
 ## Verifier requirements
 
@@ -31,7 +31,7 @@ The S3 example checks existence, enabled versioning, all four public-access bloc
 
 Agents should not receive verifier logic or reference solutions in the task image. Harbor uploads tests after the agent phase in shared mode and the oracle uploads solutions separately. This timing alone does not prevent tampering with the shared runtime. Public source code is also visible outside a trial.
 
-Before untrusted evaluation, use and validate Harbor's separate verifier environment or an equally reviewed isolation boundary. Keep verifier credentials, endpoints, dependencies, and rewards outside agent control. The verifier must still query the exact emulator scope that the agent changed. This remains TODO; the scaffold does not claim hidden, tamper-proof grading.
+Before untrusted evaluation, use and validate Harbor's separate verifier environment or an equally reviewed isolation boundary. Keep verifier credentials, endpoints, dependencies, and rewards outside agent control. The verifier must still query the exact emulator scope that the agent changed. This remains TODO; the current tasks do not claim hidden, tamper-proof grading.
 
 ## Future secondary metrics
 

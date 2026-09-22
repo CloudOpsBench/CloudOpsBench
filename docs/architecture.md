@@ -20,15 +20,15 @@ emulator process and injects its dummy identity/endpoint. Harbor controls the Co
 lifecycle. The agent and emulator share Harbor's controlled network namespace, communicating
 through loopback with no emulator port published to the host.
 
-The older secure-bucket Terraform scaffold remains blocked. Its provider integration,
-offline provider mirror, and verifier connection are still TODO. It must not be mistaken
-for the runnable-path SDK smoke task.
+The secure-bucket Terraform task now uses a pinned toolchain, an offline AWS provider
+mirror, an emulator-only starter provider, and an independent SDK verifier. It remains
+experimental: shared-container grading is not certified tamper-proof.
 
 ## Verify semantics, not reference text
 
 Equivalent correct implementations should pass. Cloud state is authoritative, not Terraform
 text, a saved plan, or agent-reported success. The smoke verifier checks bucket existence;
-the secure-bucket scaffold additionally specifies encryption, versioning, public access, and
+the secure-bucket task additionally checks encryption, versioning, public access, and
 tags. Neither implies real AWS fidelity without independent emulator validation.
 
 ## Isolation and reproducibility

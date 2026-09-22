@@ -1,77 +1,71 @@
 # Creating a task
 
-Start by reading the [specification](task-specification.md) and opening a task proposal. Use `tasks/<provider>/<lowercase-hyphenated-objective>/`; IDs must be unique. The first objective is `aws/create-secure-s3-bucket`.
+Read the [specification](task-specification.md) first. Use unique IDs and paths under
+`tasks/<provider>/<lowercase-hyphenated-objective>/`.
 
-## 1. Define the objective and initial state
+## Define the objective
 
-Write `instruction.md` as a request to the agent, not a recipe copied from the oracle. State the workspace, allowed tools, initial state, desired resource properties, and constraints. For the example: an empty isolated emulator scope, Terraform in `/workspace`, bucket `cloudopsbench-data`, versioning, all four public-access blocks, SSE, and the production tag.
+State the workspace, permitted tools, initial state, desired resource properties, and
+constraints in `instruction.md`. Do not hide scored requirements in tests. The secure S3
+example requests Terraform provisioning, versioning, all four public-access blocks,
+default SSE, and `Environment=production` on a fresh bucket.
 
-Do not hide additional scored requirements in tests. Task author notes and integration TODOs must be clearly distinguishable from the infrastructure request.
+## Build the Harbor package
 
-## 2. Create the Harbor structure
+Provide `instruction.md`, `task.toml`, `environment/Dockerfile`, `solution/solve.sh`, and
+`tests/test.sh`. Set finite timeouts and distinguish Harbor configuration from project
+metadata. `metadata.status` is informational, not an execution gate.
 
-For a new task (do not overwrite the existing example):
+The secure S3 example now installs Terraform 1.16.3 (checksum verified), AWS provider
+6.65.0 (checked-in Linux x86_64 lock file and offline mirror), AWS CLI 1.46.1, and boto3
+1.43.31. The Python base image is digest-pinned. Transitive Python/apt dependencies are
+not fully locked. Never copy solutions, verifiers, or private emulator code into the image.
 
-```bash
-mkdir -p tasks/aws/<new-task-name>/{environment,solution,tests}
-```
+The operator runner supplies a fresh emulator and phase-scoped egress control. Its endpoint
+is `http://127.0.0.1:5003`, region `us-east-1`, credentials `test`/`test`, path-style S3.
+Never inherit host credentials or permit real-cloud/metadata fallback. The secure task's
+root-owned starter provider/lock live in a sticky `/workspace`; the non-root agent can
+create resources/state files but cannot replace those starter files. Terraform runtime
+initialization uses a local mirror with no direct registry fallback.
 
-Create `instruction.md`, `task.toml`, `environment/Dockerfile`, `solution/solve.sh`, and `tests/test.sh`. You can also consult the installed Harbor task generator via `harbor init --help`. Follow the current [schema](task-specification.md#harbor-compatibility), not an older Terminal-Bench template.
+## Reference solution and verifier
 
-Populate canonical configuration sections and CloudOpsBench metadata separately. Set finite timeouts. `metadata.status = "scaffold"` documents incompleteness but does not prevent Harbor execution.
+`solution/solve.sh` copies the reference resources, initializes from the pinned lock/mirror,
+validates, and applies. It must not write rewards or call verifier helpers.
 
-## 3. Build the environment
+The verifier independently reads emulator state with explicit dummy credentials and an
+endpoint allowcheck. It checks bucket existence, versioning, public-access flags,
+encryption, and tags—not a particular Terraform implementation. The shell writes reward
+1 or 0 for semantic pass/fail; SDK/transport/authentication failures leave no reward and
+are evaluation errors. Python runs with `-I`. Tests arrive only after agent execution.
 
-The S3 Dockerfile chooses `/workspace` and deliberately fails construction until integration is defined. TODO: install pinned Terraform, AWS provider/cache, AWS CLI, Python and verifier SDK dependencies; choose and pin the base image digest. Do not copy `solution/` or `tests/` into the agent image.
+Shared-container verification is **not** a tamper-proof grading boundary. Terraform
+provenance also cannot be established from final cloud state alone.
 
-TODO: integrate emulator provisioning, readiness, isolated initial state, emulator-only connection/identity settings, network restrictions, and teardown. Do not invent endpoints or credentials or reuse host AWS configuration. Verify concurrent trials cannot share bucket state. Document the actual integration once known.
+## Validate before publishing results
 
-## 4. Write the reference solution
-
-`solution/main.tf` illustrates standard Terraform AWS S3 resources. `solution/solve.sh` describes the intended copy → init → validate → apply flow but currently exits before it can run. There is no provider connection configuration yet. TODO: supply trusted emulator-only provider configuration, pin Terraform/provider versions and generate a lock file; remove the guard only after safety and connectivity validation.
-
-An oracle must satisfy the same public objective as an agent; it must not write rewards, call verifier helpers, or bypass emulator controls.
-
-## 5. Write semantic verification
-
-`tests/test_infra.py` contains ordinary AWS S3 read API checks. Its connection factory deliberately raises an integration error before any SDK initialization or network access. TODO: bind a standard SDK client to the trusted trial scope with explicit emulator routing and identity, and classify missing-resource/configuration responses separately from infrastructure failures.
-
-`tests/test.sh` writes `1` only on successful checks and `0` otherwise; exit code `2` signals an evaluation/integration error in this scaffold. The shell preserves that error status. Harbor consumes the reward file, so review errors/logs rather than counting every zero as an agent failure. Hidden or separate verification must not trust agent-modified binaries or connection files; see [architecture](architecture.md).
-
-## 6. Validate, oracle first
-
-Available now, from repository root:
+Local checks (the verifier unit suite requires boto3, but never accesses AWS):
 
 ```bash
 python3 scripts/validate.py
+python3 scripts/test_secure_s3_verifier.py
 bash -n tasks/aws/create-secure-s3-bucket/solution/solve.sh
 bash -n tasks/aws/create-secure-s3-bucket/tests/test.sh
-harbor tasks schema
 ```
 
-Static checks confirm file layout, TOML syntax, Python syntax, and relative Markdown file links. They are not a substitute for upstream schema validation or execution. No cloud access is needed.
-
-After emulator integration (these commands are **blocked today**):
+On a configured operator runner, use a pushed task revision:
 
 ```bash
-harbor run --path tasks/aws/create-secure-s3-bucket --agent oracle --env docker
+uv run cobr run --tasks-ref "$TASKS_SHA" --task aws/create-secure-s3-bucket --harness oracle --seed 1 -k 1 -n 1 --no-upload
+uv run cobr run --tasks-ref "$TASKS_SHA" --task aws/create-secure-s3-bucket --harness nop --seed 1 -k 1 -n 1 --no-upload
 ```
 
-Inspect Harbor's job output, verifier logs, and reward. Repeat on fresh scopes and concurrently. Require reward `1` for the oracle. Use controlled incorrect variants on fresh scopes: no bucket, versioning suspended, each public-access flag false in turn, wrong/missing tag, and missing/invalid encryption where the emulator permits that state. Modern S3 may supply default encryption; test observed state rather than assuming omission of a Terraform block means no encryption.
+Require oracle 1 and nop 0 without evaluation errors. Check controlled wrong states
+(versioning suspended, public-access flags false, wrong tags), repeat on fresh emulators,
+and inspect cleanup. Missing encryption controls must respect the emulator's actual
+representation of S3 defaults. Static/mocked tests alone are not execution evidence.
 
-Validate equivalent correct implementations too. Then run one supported real agent using `--agent <agent> --model <provider/model>`. Record Harbor, emulator, image, Terraform, provider, agent/model versions and commands. Do not claim an end-to-end pass from mocked API responses.
-
-## Submission checklist
-
-- [ ] Objective is realistic, unambiguous, and all scored constraints are public.
-- [ ] Metadata, documentation, workspace, and scripts agree.
-- [ ] No real cloud credentials, host profiles, or public cloud fallback.
-- [ ] Deterministic seed, per-trial isolation, readiness, and teardown implemented.
-- [ ] Dependencies pinned and documented; no runtime dependency downloads needed for verification.
-- [ ] Oracle passes repeatedly through Harbor.
-- [ ] Each negative control fails; equivalent correct solutions pass.
-- [ ] Verifier integrity and emulator API fidelity reviewed.
-- [ ] Static checks and installed Harbor schema validation pass.
-- [ ] PR includes execution evidence, known limitations, and documentation updates.
-
-Scaffold-only PRs are welcome when explicitly labeled; they do not add release-ready benchmark tasks. See [contributing](../CONTRIBUTING.md).
+Before a release, also validate equivalent solutions, concurrency, model execution,
+verifier integrity, egress isolation, error classification, and emulator API fidelity.
+Record task SHA, emulator digest, tool/harness versions, seeds and budgets. Keep failed
+attempts and evaluation errors visible; do not weaken semantic checks to make an oracle pass.
