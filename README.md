@@ -12,9 +12,7 @@ agent's claim of success.
 | [`aws/tighten-sqs-redrive-allow-policy`](tasks/aws/tighten-sqs-redrive-allow-policy/instruction.md) | Tighten a dead-letter queue's redrive-allow policy to least privilege (Terraform) | Experimental |
 | [`aws/promote-lambda-live-alias`](tasks/aws/promote-lambda-live-alias/instruction.md) | Publish a new Lambda build and cut the `live` alias over to it (Terraform) | Experimental |
 | [`aws/tighten-kinesis-resource-policy`](tasks/aws/tighten-kinesis-resource-policy/instruction.md) | Tighten a Kinesis stream's resource policy to least privilege (Terraform) | Experimental |
-| [`aws/decommission-analytics-environment`](tasks/aws/decommission-analytics-environment/instruction.md) | Fully remove a prefixed analytics environment and nothing else | Experimental |
 | [`aws/decommission-data-pipeline`](tasks/aws/decommission-data-pipeline/instruction.md) | Fully remove a prefixed data pipeline and nothing else | Experimental |
-| [`aws/decommission-event-workload`](tasks/aws/decommission-event-workload/instruction.md) | Fully remove a prefixed event-driven workload and nothing else | Experimental |
 
 Every task starts from existing infrastructure: the task container seeds its starting cloud
 state into the trial's fresh emulator before the agent is let in (see
