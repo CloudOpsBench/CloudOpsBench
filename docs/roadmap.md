@@ -1,33 +1,26 @@
 # Roadmap
 
-No release dates are assigned. Integration tests are not a production benchmark release.
+The curated Harbor-style lifecycle contract is the sole documented task format.
+No release dates or leaderboard results are implied by integration progress.
 
 ## Implemented
 
-- [x] Public Harbor-format tasks and contributor documentation.
-- [x] SDK S3 task: oracle 1, nop 0, concurrent oracle passes on Harbor 0.21.0.
-- [x] Secure S3 Terraform task: pinned tools, checked-in provider lock, offline mirror,
-  emulator-only provider configuration, and semantic SDK verifier.
-- [x] Runner-managed fresh emulator, readiness, network namespace, and ordinary cleanup.
-- [x] Explicit loopback routing, dummy identity, and disabled metadata discovery.
-- [x] Local unit tests distinguish missing required state from SDK/transport errors.
+- Canonical source contract preserving setup, grader, assets, and solution scripts.
+- Runner-generated tool/runtime packaging, private dynamic seed state, and reward wiring.
+- Static validation and contributor documentation for lifecycle exports.
+- Rendering and Compose/Harbor metadata checks for the ten curated Harbor exports.
+- Unit tests for runtime adaptation, state handling, and verifier verdicts.
 
 ## Integration and release gates
 
-- [ ] Comprehensive S3 API fidelity and equivalent-solution validation.
-- [ ] Adversarial network, cross-trial, cancellation, and credential-isolation review.
-- [ ] Separate trusted verifier and reward storage outside agent control.
-- [ ] Fully locked transitive dependencies and long-term image retention/replay.
-- [ ] Model evaluation coverage for every task with published budgets and error accounting.
-- [ ] Enforce/document Terraform provenance without trusting generated text or local state.
-- [ ] Stable aggregate publication and reviewed private artifact handling.
+- Publish the curated task packages at a pinned repository revision.
+- Validate Docker/Harbor execution of the lifecycle runtime end-to-end.
+- Run oracle, nop, incomplete-fix, and equivalent-solution controls per task.
+- Review network, credential, cross-trial, cancellation, and cleanup isolation.
+- Validate grader integrity and reward storage against adversarial agents.
+- Lock dependencies and define long-term image retention/replay policy.
+- Calibrate model budgets, task difficulty, and error accounting.
+- Stabilize aggregate publication and review private artifact handling.
 
-## Expansion
-
-- [ ] Five high-quality AWS/Terraform tasks after the first task integrations are validated.
-- [ ] Broader provisioning, debugging, IAM, networking, security, and multi-service coverage.
-- [ ] Calibrated task difficulty, stronger CI, negative controls, and reproducible releases.
-- [ ] Versioned benchmark, public results, and methodology/limitations report.
-
-Azure, GCP, OpenTofu, Pulumi, CloudFormation, CDK, Kubernetes/cloud-ops and multi-cloud
-scenarios remain future directions, not implemented support.
+Real-AWS orchestration and additional cloud providers remain separate future work.
+Do not fork task tests to accommodate execution backend differences.

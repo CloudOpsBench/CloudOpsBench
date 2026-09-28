@@ -1,85 +1,66 @@
 # CloudOpsBench
 
 An open-source task suite for evaluating AI agents on cloud infrastructure operations.
-Tasks are executed through [Harbor](https://harborframework.com/docs) against an isolated
-AWS emulator. Verifiers check resulting cloud state, not plausible-looking code or an
-agent's claim of success.
+Tasks define the initial cloud state, the agent's objective, and the checks for success.
+One canonical task definition is used across execution backends; tests are not rewritten
+for the emulator.
 
-## Current tasks
+## Task format
 
-| Task | Objective | Status |
-|---|---|---|
-| [`aws/tighten-sqs-redrive-allow-policy`](tasks/aws/tighten-sqs-redrive-allow-policy/instruction.md) | Tighten a dead-letter queue's redrive-allow policy to least privilege (Terraform) | Experimental |
-| [`aws/promote-lambda-live-alias`](tasks/aws/promote-lambda-live-alias/instruction.md) | Publish a new Lambda build and cut the `live` alias over to it (Terraform) | Experimental |
-| [`aws/tighten-kinesis-resource-policy`](tasks/aws/tighten-kinesis-resource-policy/instruction.md) | Tighten a Kinesis stream's resource policy to least privilege (Terraform) | Experimental |
-| [`aws/decommission-data-pipeline`](tasks/aws/decommission-data-pipeline/instruction.md) | Fully remove a prefixed data pipeline and nothing else | Experimental |
-
-Every task starts from existing infrastructure: the task container seeds its starting cloud
-state into the trial's fresh emulator before the agent is let in (see
-[seeded tasks](docs/seeded-tasks.md)). Oracle **1** / nop **0** were checked against the
-emulator outside Harbor; runs through the operator runner are still pending.
-No model evaluations or leaderboard results have been published.
-
-## How grading works
+The curated Harbor-style lifecycle layout is the only documented task contract:
 
 ```text
-Task instruction → agent → emulator APIs → resulting cloud state → verifier → 0 or 1
+tasks/aws/<task-id>/
+├── instruction.md
+├── task.toml
+├── environment/
+│   ├── Dockerfile                 # optional tool-image override
+│   └── lifecycle/
+│       ├── setup.sh
+│       ├── teardown.sh            # optional
+│       └── assets/                # optional
+├── tests/
+│   └── check.py
+└── solution/
+    └── solve.sh
 ```
 
-- **1:** required state exists.
-- **0:** required state does not exist.
-- **No valid reward:** verifier/setup error, reported separately.
+Publish the original instructions, setup, grader, assets, and reference solution.
+The runner supplies execution scaffolding in a rendered copy: shared runtime dependencies,
+startup coordination, endpoint/credential configuration, and the Harbor reward entrypoint.
+Do not add emulator-only assertions, fixed dummy resource IDs, or endpoint guards to task
+logic. See the [task specification](docs/task-specification.md) and
+[lifecycle contract](docs/seeded-tasks.md).
 
-Reference solutions change the cloud; verifiers independently read it back. The pipeline
-itself was first proven with a since-retired S3 smoke task; see the
-[recorded smoke evidence](docs/smoke-test.md#executed-smoke-evidence).
-Emulator-support issue tracking is a separate runner concern and never rewrites rewards.
+The ten curated Harbor exports establish this format. They have not been imported into
+this repository by the runtime integration change. Remaining older task directories are
+not examples of the supported authoring contract or a validated current task release.
 
-## Public content and private execution
-
-This repository contains task instructions, container recipes, verifiers, reference
-solutions, and documentation under the [MIT license](LICENSE).
-
-The emulator and [CloudOpsBenchRunner](https://github.com/CloudOpsBench/CloudOpsBenchRunner)
-are private. The runner injects the emulator image and dummy identity into each task and
-uses Harbor for execution. **Cloning this public repository alone is not sufficient to
-run cloud tasks.** No real AWS account or real cloud credentials should be supplied to
-the task containers. Deployment instructions live in the private runner's `RUNNING.MD`.
-
-The smoke integration targets **Harbor 0.21.0**. See [smoke-test notes](docs/smoke-test.md)
-for the connection contract, execution procedure, and limitations. Shared-container grading
-is used for trusted oracle/nop tests; untrusted model grading still needs isolation review.
-
-## Creating tasks: reference solution convention
-
-Follow the [task creation guide](docs/creating-tasks.md). Keep reference solutions split into:
+## Execution and grading
 
 ```text
-solution/
-├── solve.sh     Harbor oracle entrypoint: endpoint guard and dummy credentials
-└── golden.sh    Commands that actually solve the task
+Canonical task → runner rendering → setup → agent → unchanged grader → reward
 ```
 
-`solve.sh` must refuse endpoints other than the trial emulator, configure the dummy
-identity, change to `/workspace`, and invoke `bash /solution/golden.sh`. Keep the actual
-solution logic in `golden.sh` and propagate failures back to Harbor.
+- **1:** the grader passes.
+- **0:** the grader explicitly fails.
+- **No valid reward:** setup or verifier execution error.
 
-This is a valid Harbor layout: `solve.sh` is the standard oracle entrypoint and may call
-helper scripts. The name `golden.sh` and this split are **CloudOpsBench conventions**, not
-Harbor requirements. Neither script belongs in the agent image or workspace.
+The private [CloudOpsBenchRunner](https://github.com/CloudOpsBench/CloudOpsBenchRunner)
+currently executes tasks through Harbor 0.21.0 against a private AWS emulator. It supplies
+dummy credentials and an isolated emulator per trial. An AWS harness can consume the
+same task logic with scoped AWS credentials and cleanup; real-AWS orchestration is not
+implemented in this runner. Cloning this repository alone does not provide an execution
+backend. Never supply real credentials to emulator task containers.
 
-Reference solutions complete the task; they do not initialize it. Starting state belongs
-in `environment/seed/setup.sh`, run by the container entrypoint before its readiness
-health check passes. See [seeded tasks](docs/seeded-tasks.md).
+Rendering, Compose configuration, and Harbor metadata were checked for the ten curated
+exports. Full Docker/Harbor lifecycle execution and adversarial isolation validation remain
+release gates. No benchmark results are implied by those packaging checks.
 
-## Repository layout
+## Contributing
 
-```text
-tasks/aws/<task>/        One Harbor task per directory (see the table above)
-docs/                    Task conventions, evaluation, roadmap
-scripts/validate.py      Dependency-free static checks
-.github/                 Contribution templates
-```
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [creating tasks](docs/creating-tasks.md),
+[architecture](docs/architecture.md), and [evaluation](docs/evaluation.md).
 
 Run static checks with Python 3.11+:
 
@@ -87,6 +68,5 @@ Run static checks with Python 3.11+:
 python3 scripts/validate.py
 ```
 
-These checks do not execute Docker, Harbor, or the emulator. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[task specification](docs/task-specification.md), [architecture](docs/architecture.md),
-and [evaluation](docs/evaluation.md).
+Static checks are not execution tests. See the [validation procedure](docs/smoke-test.md)
+and [roadmap](docs/roadmap.md). Public content is under the [MIT license](LICENSE).

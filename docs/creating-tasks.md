@@ -1,71 +1,48 @@
-# Creating a task
+# Creating or importing a task
 
-Read the [specification](task-specification.md) first. Use unique IDs and paths under
-`tasks/<provider>/<lowercase-hyphenated-objective>/`.
+Use the [task specification](task-specification.md) and [lifecycle contract](seeded-tasks.md).
+The curated Harbor-style format is the only documented authoring path.
 
-## Define the objective
+## 1. Preserve the task
 
-State the workspace, permitted tools, initial state, desired resource properties, and
-constraints in `instruction.md`. Do not hide scored requirements in tests. The secure S3
-example requests Terraform provisioning, versioning, all four public-access blocks,
-default SSE, and `Environment=production` on a fresh bucket.
+Place the task under `tasks/aws/<task-id>/`. Keep `instruction.md`,
+`environment/lifecycle/setup.sh`, its assets, `tests/check.py`, and `solution/solve.sh`
+unchanged when importing an existing task. Retain optional lifecycle teardown scripts.
 
-## Build the Harbor package
+Do not weaken checks, skip unsupported operations, replace dynamic seed files with static
+fixtures, or add emulator-specific expected results. Any genuine task defect should be
+fixed transparently in the canonical task for all execution backends.
 
-Provide `instruction.md`, `task.toml`, `environment/Dockerfile`, `solution/solve.sh`, and
-`tests/test.sh`. Set finite timeouts and distinguish Harbor configuration from project
-metadata. `metadata.status` is informational, not an execution gate.
+## 2. Declare dependencies and metadata
 
-The secure S3 example now installs Terraform 1.16.3 (checksum verified), AWS provider
-6.65.0 (checked-in Linux x86_64 lock file and offline mirror), AWS CLI 1.46.1, and boto3
-1.43.31. The Python base image is digest-pinned. Transitive Python/apt dependencies are
-not fully locked. Never copy solutions, verifiers, or private emulator code into the image.
+Include `task.toml`. The directory supplies the task ID when `metadata.id` is absent.
+Set appropriate timeouts and record task metadata without embedding credentials.
 
-The operator runner supplies a fresh emulator and phase-scoped egress control. Its endpoint
-is `http://127.0.0.1:5003`, region `us-east-1`, credentials `test`/`test`, path-style S3.
-Never inherit host credentials or permit real-cloud/metadata fallback. The secure task's
-root-owned starter provider/lock live in a sticky `/workspace`; the non-root agent can
-create resources/state files but cannot replace those starter files. Terraform runtime
-initialization uses a local mirror with no direct registry fallback.
+A Dockerfile is optional when the runner's shared image supplies the required tools.
+For additional dependencies, publish `environment/Dockerfile` with Python 3, boto3,
+AWS CLI, bash, a non-root `agent` user, and the extra tools. Pin versions where possible.
+The runner owns startup coordination; keep setup in the lifecycle script.
 
-## Reference solution and verifier
+Do not supply a custom `tests/test.sh`, emulator Compose file, or solution endpoint wrapper.
+The runner adds execution scaffolding to a copy, leaving the canonical task logic intact.
 
-`solution/solve.sh` copies the reference resources, initializes from the pinned lock/mirror,
-validates, and applies. It must not write rewards or call verifier helpers.
-
-The verifier independently reads emulator state with explicit dummy credentials and an
-endpoint allowcheck. It checks bucket existence, versioning, public-access flags,
-encryption, and tags—not a particular Terraform implementation. The shell writes reward
-1 or 0 for semantic pass/fail; SDK/transport/authentication failures leave no reward and
-are evaluation errors. Python runs with `-I`. Tests arrive only after agent execution.
-
-Shared-container verification is **not** a tamper-proof grading boundary. Terraform
-provenance also cannot be established from final cloud state alone.
-
-## Validate before publishing results
-
-Local checks (the verifier unit suite requires boto3, but never accesses AWS):
+## 3. Validate
 
 ```bash
 python3 scripts/validate.py
-python3 scripts/test_secure_s3_verifier.py
-bash -n tasks/aws/create-secure-s3-bucket/solution/solve.sh
-bash -n tasks/aws/create-secure-s3-bucket/tests/test.sh
+# Substitute the imported task's actual path.
+bash -n tasks/aws/<task-id>/environment/lifecycle/setup.sh
+bash -n tasks/aws/<task-id>/solution/solve.sh
 ```
 
-On a configured operator runner, use a pushed task revision:
+Inspect the rendered package and verify that original script contents are unchanged.
+Run oracle, nop, and deliberately incomplete fixes on fresh trials using the
+[validation procedure](smoke-test.md). Check state preservation, collateral-change checks,
+and equivalent valid solutions, not merely the reference solution's success.
 
-```bash
-uv run cobr run --tasks-ref "$TASKS_SHA" --task aws/create-secure-s3-bucket --harness oracle --seed 1 -k 1 -n 1 --no-upload
-uv run cobr run --tasks-ref "$TASKS_SHA" --task aws/create-secure-s3-bucket --harness nop --seed 1 -k 1 -n 1 --no-upload
-```
+## 4. Publish evidence, not assumptions
 
-Require oracle 1 and nop 0 without evaluation errors. Check controlled wrong states
-(versioning suspended, public-access flags false, wrong tags), repeat on fresh emulators,
-and inspect cleanup. Missing encryption controls must respect the emulator's actual
-representation of S3 defaults. Static/mocked tests alone are not execution evidence.
-
-Before a release, also validate equivalent solutions, concurrency, model execution,
-verifier integrity, egress isolation, error classification, and emulator API fidelity.
-Record task SHA, emulator digest, tool/harness versions, seeds and budgets. Keep failed
-attempts and evaluation errors visible; do not weaken semantic checks to make an oracle pass.
+Record the exact task commit, runtime and emulator versions, Harbor version, timeouts,
+attempt policy, and observed rewards/errors. Static checks and rendering are not proof
+of execution or emulator fidelity. Review logs for sensitive content before publication.
+See [evaluation](evaluation.md) and [CONTRIBUTING](../CONTRIBUTING.md).

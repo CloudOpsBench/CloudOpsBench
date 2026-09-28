@@ -1,84 +1,70 @@
 # Task specification
 
-## Harbor compatibility
+## Canonical Harbor-style source
 
-Both S3 tasks target the installed Harbor **0.21.0** release. The secure-bucket task
-uses Terraform and an offline provider mirror; the [SDK smoke task](smoke-test.md) is
-the smaller integration control. Both remain experimental, not certified adversarial benchmarks.
-
-Canonical references: [Harbor task documentation](https://harborframework.com/docs/tasks), [official source documentation](https://github.com/harbor-framework/harbor/blob/96a13544537e54be84c0f316f8c3156769380684/docs/content/docs/tasks/index.mdx), and [configuration model](https://github.com/harbor-framework/harbor/blob/96a13544537e54be84c0f316f8c3156769380684/src/harbor/models/task/config.py).
-
-The schema version is `"1.4"`. Initial source inspection used upstream revision
-`96a13544537e54be84c0f316f8c3156769380684`; execution uses Harbor 0.21.0. Use
-`harbor tasks schema` and `harbor run --help` to inspect the installed release.
-
-Do not substitute legacy Terminal-Bench `task.yaml`, `run-tests.sh`, or flat timeout fields. Harbor's current format is:
+The curated lifecycle layout is the sole documented task format:
 
 ```text
 <task>/
 ├── instruction.md
 ├── task.toml
 ├── environment/
-│   └── Dockerfile
-├── solution/
-│   ├── solve.sh
-│   └── main.tf
-└── tests/
-    ├── test.sh
-    └── test_infra.py
+│   ├── Dockerfile                 # optional; runner has a shared default
+│   └── lifecycle/
+│       ├── setup.sh
+│       ├── teardown.sh            # optional
+│       └── assets/                # optional
+├── tests/check.py
+└── solution/solve.sh
 ```
 
-`main.tf` and `test_infra.py` are CloudOpsBench implementation choices. Harbor requires the shell entry points for this Linux task; a solution is optional upstream but required for releasable CloudOpsBench tasks. Docker is our initial environment target, not a Harbor-wide requirement.
+Preserve existing setup, grader, solution, and asset contents when importing a task.
+Do not adapt assertions or expected results to emulator behavior. Fix task defects as
+explicit, versioned changes shared by all backends, not private compatibility patches.
 
-## Fields and conventions
+## Metadata
 
-| Concept | Location / meaning |
-| --- | --- |
-| Task ID | CloudOpsBench `metadata.id`: `aws/create-secure-s3-bucket`; path under `tasks/` |
-| Harbor package identity | Canonical `[task].name`: `cloudopsbench/aws-create-secure-s3-bucket` in Harbor's `org/name` format; not a claim of registry publication |
-| Provider | CloudOpsBench `metadata.provider`, initially `aws` |
-| Category | CloudOpsBench `metadata.category`, example `storage` |
-| Difficulty | CloudOpsBench `metadata.difficulty`, provisional `easy`, `medium`, or `hard` |
-| Status | CloudOpsBench `metadata.status`, example `scaffold`; informational, **not a Harbor execution gate** |
-| Instruction | `instruction.md`: user-facing objective and all scored requirements |
-| Initial state | Document in instruction and implement deterministic environment bootstrap; fresh per-trial S3 emulator supplied by the runner |
-| Environment | Canonical `[environment]`, plus Docker build definition; workspace chosen through Docker `WORKDIR /workspace` |
-| Allowed tools | Instruction and installed environment; Terraform required, shell permitted, AWS CLI installed for inspection; not a custom Harbor config field |
-| Reference solution | `solution/solve.sh` and helpers; Harbor oracle copies these to `/solution` |
-| Verifier | `tests/test.sh` and helpers; shared-mode Harbor copies these to `/tests` |
-| Expected final state | Instruction requirements mapped to semantic assertions in verifier |
-| Constraints | Instruction; emulator-only access, Terraform workspace and bucket requirements |
-| Timeout | Canonical `[agent].timeout_sec`, `[verifier].timeout_sec`, `[environment].build_timeout_sec`; provisional budgets, calibrate after integration |
-| Scoring | `tests/test.sh` writes scalar `0` or `1` to `/logs/verifier/reward.txt` |
+- Place tasks under `tasks/aws/<task-id>/`; the relative path is the task ID.
+- `metadata.id` is optional for lifecycle exports. If supplied, it must match the path.
+- `[task].name` identifies the source task. The runner prefixes an unqualified name with
+  `cloudopsbench/` in the rendered copy to satisfy Harbor's `org/name` requirement.
+- Use `[metadata]` for descriptions and curation information.
+- Configure task-appropriate `[agent].timeout_sec`, `[verifier].timeout_sec`, and
+  `[environment].build_timeout_sec`. Calibrate budgets before publishing results.
 
-Harbor permits arbitrary `[metadata]`; the keys above are CloudOpsBench conventions, not upstream validation or routing features. Suggested future categories: provisioning, debugging, networking, iam, security, storage, databases, compute, containers, observability, recovery, migration, cost, multi-service. Difficulty should be justified and calibrated, not inferred from file length.
+## Source vs. rendered package
 
-Harbor's reserved paths include `/tests`, `/solution`, `/logs/verifier`, and `/logs/agent`. Harbor does **not** mandate `/workspace`; CloudOpsBench chooses it in the Dockerfile. Scripts use absolute helper paths because Harbor executes them from the environment's working directory. Keep solutions and tests out of the agent image's build context.
+Source exports depend on the runner's runtime contract. They are not standalone upstream
+Harbor packages until rendered. The runner supplies `tests/test.sh`, runtime helpers,
+Compose configuration, and execution metadata for Harbor 0.21.0. Do not author a competing
+`tests/test.sh` for this adapter; it rejects conflicting verifier entrypoints.
 
-## Quality contract
+A Dockerfile may supply additional tools. It must provide Python 3, boto3, AWS CLI, bash,
+and a non-root `agent` user. The runner owns the final entrypoint, user, working directory,
+and readiness coordination. Put task setup in `environment/lifecycle/setup.sh`, not in a
+custom image entrypoint. Do not copy tests or solutions into the agent image.
 
-A release-ready task has:
+## Lifecycle and scoring
 
-1. A clear user-facing infrastructure objective.
-2. A deterministic starting state.
-3. An isolated environment.
-4. A known-good reference solution tested through Harbor's oracle.
-5. A verifier checking semantics/final cloud state.
-6. No dependence on real cloud credentials.
-7. Reproducible results, including negative controls.
+Setup runs before the agent. Setup and the unchanged grader share a protected runspace,
+including the actual generated `seed_state.json`. The runner supplies `TASK_STATE_DIR`;
+the agent uses a separate `/workspace`. See [seeded tasks](seeded-tasks.md) for details
+and limitations on agent-visible generated files.
 
-Tooling and emulator connections are implemented. Full adversarial isolation, trusted
-grading, and broad fidelity validation remain release gates. Structural validity or an
-oracle pass alone must never be represented as benchmark readiness.
+The grader uses normal AWS CLI/boto3 calls or the shared `checkkit` helpers. Endpoint
+routing and credentials are backend configuration, not task logic. An explicit successful
+exit maps to reward 1; explicit exit 1 maps to reward 0. Uncaught Python exceptions or
+other exit codes are evaluation errors. The generated shell wrapper emits Harbor's
+`/logs/verifier/reward.txt`; the original grader need not know that path.
 
-## S3 scoring contract
+## Release requirements
 
-Required bucket: `cloudopsbench-data`. All checks must pass:
+- Clear objective and constraints, with grading consistent with the instruction.
+- Reproducible starting state and isolated per-trial resources.
+- Reference solution and negative controls tested on fresh trials.
+- Equivalent valid solutions accepted by the same grader.
+- Recorded task/runtime/emulator versions, timeouts, and attempt policy.
+- Reviewed credential, seed-state, verifier, and reward isolation.
 
-- Bucket exists (`HeadBucket`).
-- `GetBucketVersioning` reports `Enabled`.
-- All four bucket-level `GetPublicAccessBlock` flags are true.
-- `GetBucketEncryption` reports a default SSE algorithm: `AES256`, `aws:kms`, or `aws:kms:dsse`.
-- `GetBucketTagging` includes `Environment=production`.
-
-The oracle uses SSE-S3 (`AES256`); equivalent valid encryption is accepted. This is configuration verification, not a complete proof of S3 authorization or encryption-at-rest implementation. Emulator API fidelity and any behavioral security probes must be validated before release. Missing resources/configuration fail; connection/configuration failures are evaluation errors, never success. See [evaluation](evaluation.md).
+Static validity, successful rendering, or an oracle pass alone is not benchmark readiness.
+See [evaluation](evaluation.md) and [validation](smoke-test.md).

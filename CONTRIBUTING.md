@@ -4,11 +4,11 @@ Thanks for helping build an executable infrastructure benchmark. We welcome docu
 
 ## Propose before building
 
-Use the new-task issue template to describe provider/services, realistic user objective, deterministic initial state, desired final state, difficulty, verifier strategy, and reference-solution feasibility. Check existing issues first. For now, prioritize the minimal SDK S3 smoke task and the blocked AWS + Terraform S3 task rather than expanding scaffolds.
+Use the new-task issue template to describe provider/services, realistic user objective, deterministic initial state, desired final state, difficulty, verifier strategy, and reference-solution feasibility. Check existing issues first. Use the curated Harbor-style lifecycle contract; do not introduce another task layout.
 
 ## Create a task
 
-Read the [architecture](docs/architecture.md), [task specification](docs/task-specification.md), and [step-by-step tutorial](docs/creating-tasks.md). Use `tasks/<provider>/<lowercase-hyphenated-objective>/`; keep CloudOpsBench IDs unique and Harbor package names in `org/name` format.
+Read the [architecture](docs/architecture.md), [task specification](docs/task-specification.md), and [step-by-step tutorial](docs/creating-tasks.md). Use `tasks/aws/<task-id>/` and keep IDs unique. Preserve imported setup, tests, assets, and solutions. The runner qualifies task names and supplies execution wrappers in a rendered copy.
 
 CloudOpsBench owns tasks; Harbor is the harness. Do not add a custom runner or vendor Harbor. Keep changes focused and dependencies justified.
 
@@ -23,7 +23,9 @@ CloudOpsBench owns tasks; Harbor is the harness. Do not add a custom runner or v
 - Document dependency versions, emulator assumptions, limitations, and reproducible commands.
 - Treat verifier tampering and real-cloud fallback as safety bugs.
 
-The secure-bucket Terraform example is explicitly blocked; the SDK bucket task is an integration smoke test, not a calibrated benchmark. Scaffold contributions may retain documented TODOs, but cannot be counted as validated tasks.
+Keep task logic backend-neutral. Credentials and endpoint routing belong to the harness,
+not task-specific emulator wrappers. Lifecycle rendering checks are not end-to-end validation;
+include oracle and negative-control execution evidence before claiming a task is validated.
 
 ## Pull request process
 

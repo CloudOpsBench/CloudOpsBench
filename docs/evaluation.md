@@ -1,11 +1,14 @@
 # Evaluation
 
-## Current smoke check
+## Canonical task grading
 
-The [minimal SDK task](smoke-test.md) checks only bucket existence. Its verifier writes `1`
-for the required bucket, `0` for absence, and **no reward** for an evaluation error.
-Oracle/nop runs validate the pipeline, not model capability. Emulator support reports live
-in a separate runner table and never modify binary rewards.
+The runner executes the original `tests/check.py` using the [lifecycle contract](seeded-tasks.md).
+Its wrapper maps explicit exit 0 to reward `1`, explicit exit 1 to reward `0`, and uncaught
+Python exceptions or other exit codes to evaluation errors with **no reward**. Setup errors
+also yield no scored attempt. Existing graders that catch an infrastructure error and
+explicitly fail retain that behavior; the wrapper cannot infer intent without changing tests.
+[Oracle/nop controls](smoke-test.md) validate the pipeline, not model capability.
+Emulator-support reports are separate from scoring and never modify binary rewards.
 
 ## Primary metric: pass@1 / task success rate
 
@@ -13,7 +16,7 @@ For an initial pass@1 estimate, use a fixed attempt policy and configuration. Wi
 
 Each valid trial has a binary reward: `1` only if every required final-state check passes, otherwise `0`. Harbor reads `/logs/verifier/reward.txt` and owns execution, logging, and aggregation. CloudOpsBench supplies task semantics, not a runner.
 
-Always report task-set revision, denominator, exclusions, infrastructure errors, agent/model configuration, attempt policy, timeouts, and tool/emulator/Harbor versions. Agent timeouts count as failures under the published budget. Emulator unavailability, invalid setup, or verifier crashes are evaluation errors: report separately and rerun under a declared policy, never silently omit them to improve scores. The current tasks are experimental integration tests, not a release-ready leaderboard.
+Always report task-set revision, denominator, exclusions, infrastructure errors, agent/model configuration, attempt policy, timeouts, and tool/emulator/Harbor versions. Agent timeouts count as failures under the published budget. Emulator unavailability, invalid setup, or verifier crashes are evaluation errors: report separately and rerun under a declared policy, never silently omit them to improve scores. The canonical runtime still requires end-to-end validation; packaging checks are not a release-ready leaderboard.
 
 ## Verifier requirements
 
@@ -25,7 +28,9 @@ Always report task-set revision, denominator, exclusions, infrastructure errors,
 - Use bounded retries only for documented readiness/consistency behavior, not arbitrary sleeps or indefinite polling.
 - Preserve diagnostic evidence; never log credentials.
 
-The S3 example checks existence, enabled versioning, all four public-access blocks, default SSE configuration, and the required tag through normal S3 API concepts. Configuration errors currently exit `2`; assertion failures exit `1`; successful checks exit `0`. The shell writes no reward on evaluation errors; Harbor's collected errors and verifier logs must be reviewed before aggregation.
+Each task defines its own semantic checks. Preserve those checks across AWS and emulator
+execution. Review Harbor's collected errors and verifier logs before aggregation; do not
+silently reinterpret an infrastructure problem as agent failure.
 
 ## Verifier isolation
 

@@ -1,54 +1,48 @@
 # Architecture
 
-CloudOpsBench owns task content; Harbor owns execution. The private CloudOpsBenchRunner
-packages tasks with a private emulator. It is an orchestration wrapper, not a fork of Harbor.
+CloudOpsBench owns canonical tasks. Harbor executes trials. The private runner supplies
+backend configuration and runtime scaffolding without rewriting task tests.
 
 ```text
-Public task → private runner rendering → Harbor trial
-                                         ├── agent container
-                                         ├── emulator container
-                                         └── egress-control sidecar
-                                               ↓
-                                     verifier → binary reward
+Canonical lifecycle task → runner-rendered Harbor package
+                              ├── setup service → private per-trial seed state
+                              ├── agent container → cloud operations
+                              ├── dedicated emulator
+                              └── Harbor egress-control sidecar
+                                         ↓
+                              unchanged grader → binary reward
 ```
 
-## Current integration
+## Ownership
 
-The [SDK S3 smoke task](smoke-test.md) exercises the smallest useful path: an agent creates
-a bucket, then a verifier queries the same emulator. The runner gives each trial a fresh
-emulator process and injects its dummy identity/endpoint. Harbor controls the Compose
-lifecycle. The agent and emulator share Harbor's controlled network namespace, communicating
-through loopback with no emulator port published to the host.
+| Component | Responsibility |
+|---|---|
+| Task | Instructions, setup, assets, grader, reference solution, optional teardown |
+| Runner | Tool runtime, lifecycle ordering, endpoints, credentials, isolation, seed state, reward wiring |
+| Emulator | AWS API behavior and per-trial cloud state |
+| Harbor | Trial execution and artifacts |
 
-The secure-bucket Terraform task now uses a pinned toolchain, an offline AWS provider
-mirror, an emulator-only starter provider, and an independent SDK verifier. It remains
-experimental: shared-container grading is not certified tamper-proof.
+The runner currently implements emulator execution only. Backend-neutral task logic also
+permits an AWS harness to run the same scripts with real scoped credentials and cleanup;
+real-AWS orchestration is not implemented here.
 
-## Verify semantics, not reference text
+## Semantic consistency
 
-Equivalent correct implementations should pass. Cloud state is authoritative, not Terraform
-text, a saved plan, or agent-reported success. The smoke verifier checks bucket existence;
-the secure-bucket task additionally checks encryption, versioning, public access, and
-tags. Neither implies real AWS fidelity without independent emulator validation.
+Preserve setup and grading logic across backends. Equivalent correct solutions should pass;
+cloud state and behavior, not reference-solution text or agent claims, determine success.
+Unsupported emulator behavior is not a reason to weaken task assertions.
 
 ## Isolation and reproducibility
 
-Required before publishing untrusted model results:
+The setup service gates agent startup. Setup and grading share private dynamic state; the
+agent runs non-root in a separate workspace. Tests are uploaded at verification time and
+solutions are provided only to the oracle. These controls are not a certification of
+shared-container grading against adversarial agents.
 
-- Independent emulator state per trial and verified cleanup after failure/cancellation.
-- Recorded task commit, emulator digest, Harbor/tool versions, seeds, and attempt policy.
-- No real cloud credentials, host profiles, metadata credentials, or real-cloud API egress.
-- Tested model-provider allowlisting and cross-trial isolation.
-- Trusted verifier runtime and reward artifacts outside agent control.
+Before publishing results, validate per-trial isolation, egress, credential handling,
+cleanup, grader integrity, and reward protection. Record the task commit, runtime and
+emulator versions, Harbor version, timeouts, and attempt policy.
 
-The smoke image runs agents as a non-root user and uses root-owned tools. Harbor uploads
-tests only for verification and solutions only for the oracle. This is useful separation,
-but a shared container is **not a fully trusted grading boundary**: malicious processes or
-runtime modifications require additional defenses. A separate verifier integration and
-adversarial testing remain prerequisites for untrusted evaluation.
-
-Emulator gap reports are independent from task rewards. They can help diagnose limitations,
-but an unsupported operation alone does not prove the emulator caused a task failure.
-
-See [task specification](task-specification.md), [evaluation](evaluation.md), and
-[roadmap](roadmap.md). Future cloud providers and broader IaC coverage remain planned work.
+Emulator-support reports are independent of task rewards. They do not rewrite scores or
+prove the cause of a failure. See [evaluation](evaluation.md), the
+[task specification](task-specification.md), and [roadmap](roadmap.md).
