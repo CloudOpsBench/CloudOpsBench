@@ -8,10 +8,13 @@ import tomllib
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-REQUIRED = (
-    "instruction.md", "task.toml", "environment/Dockerfile",
-    "solution/solve.sh", "tests/test.sh",
-)
+REQUIRED = ("instruction.md", "task.toml", "solution/solve.sh")
+
+
+def required_files(task):
+    if (task / "environment/lifecycle/setup.sh").is_file():
+        return (*REQUIRED, "tests/check.py")
+    return (*REQUIRED, "environment/Dockerfile", "tests/test.sh")
 
 
 def main():
@@ -22,13 +25,17 @@ def main():
     ids = set()
     for config in configs:
         task = config.parent
-        for name in REQUIRED:
+        for name in required_files(task):
             if not (task / name).is_file():
                 errors.append(f"{task.relative_to(ROOT)}: missing {name}")
         try:
             data = tomllib.loads(config.read_text())
-            task_id = data.get("metadata", {}).get("id")
-            if task_id != task.relative_to(ROOT / "tasks").as_posix():
+            lifecycle = (task / "environment/lifecycle/setup.sh").is_file()
+            if lifecycle and (task / "tests/test.sh").exists():
+                errors.append(f"{task.relative_to(ROOT)}: lifecycle runtime owns tests/test.sh")
+            path_id = task.relative_to(ROOT / "tasks").as_posix()
+            task_id = data.get("metadata", {}).get("id", path_id if lifecycle else None)
+            if task_id != path_id:
                 errors.append(f"{config.relative_to(ROOT)}: ID/path mismatch")
             if task_id in ids:
                 errors.append(f"Duplicate task ID: {task_id}")

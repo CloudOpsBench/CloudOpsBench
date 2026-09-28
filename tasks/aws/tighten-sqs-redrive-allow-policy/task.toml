@@ -1,42 +1,10 @@
-schema_version = "1.4"
-
 [task]
-name = "cloudopsbench/aws-tighten-sqs-redrive-allow-policy"
+name = "tighten-sqs-redrive-allow-policy"
 description = "Tighten a dead-letter queue's redrive-allow policy to least privilege."
-keywords = ["aws", "terraform", "sqs", "security", "least-privilege"]
 
-# CloudOpsBench conventions; status is NOT an execution gate in Harbor.
 [metadata]
-id = "aws/tighten-sqs-redrive-allow-policy"
-provider = "aws"
-category = "security"
-difficulty = "hard"
-status = "experimental"
-source = "aws_task05_sqs_redrive_allow_severed_21c075f3"
-
-[agent]
-timeout_sec = 1800.0
-user = "agent"
-
-[verifier]
-timeout_sec = 600.0
-user = "root"
-# Shared-container grading is not claimed tamper-proof.
-environment_mode = "shared"
-
-[environment]
-build_timeout_sec = 900.0
-cpus = 2
-memory_mb = 4096
-storage_mb = 10240
-# The runner supplies a fresh emulator and phase-scoped model-provider egress.
-network_mode = "no-network"
-
-# The entrypoint seeds the starting cloud state; the agent starts only once it is in place.
-[environment.healthcheck]
-command = "test -f /run/cloudopsbench/ready"
-interval_sec = 5.0
-timeout_sec = 10.0
-start_period_sec = 600.0
-start_interval_sec = 2.0
-retries = 3
+initial_state_description = "Terraform manages the orders main queue and its dead-letter queue, whose redrive allow policy initially permits every source queue in the account. A separate retry queue, created outside Terraform, already uses that same dead-letter queue as its redrive target."
+outcome_description = "The dead-letter queue uses a byQueue redrive allow policy that includes both the named main queue and the existing retry queue, with no recognized wildcard grant. Tightening the broad grant must not break the out-of-band retry queue dependency."
+criteria_descriptions = ["The dead-letter queue exists and has a readable RedriveAllowPolicy.", "The redrivePermission value is byQueue rather than allowAll or denyAll.", "The source queue ARN list includes the orders main queue.", "The source queue ARN list includes the out-of-band orders retry queue.", "The source list contains neither a bare wildcard nor an account-wide queue wildcard."]
+keywords = ["aws", "terraform", "sqs", "security", "least-privilege"]
+extra_tools = []

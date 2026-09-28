@@ -32,9 +32,19 @@ Do not add emulator-only assertions, fixed dummy resource IDs, or endpoint guard
 logic. See the [task specification](docs/task-specification.md) and
 [lifecycle contract](docs/seeded-tasks.md).
 
-The ten curated Harbor exports establish this format. They have not been imported into
-this repository by the runtime integration change. Remaining older task directories are
-not examples of the supported authoring contract or a validated current task release.
+The ten curated Harbor exports establish this format. The current source packages are:
+
+| Task | Objective |
+|---|---|
+| [`aws/promote-lambda-live-alias`](tasks/aws/promote-lambda-live-alias/instruction.md) | Roll out a Lambda build while preserving its consumer |
+| [`aws/tighten-kinesis-resource-policy`](tasks/aws/tighten-kinesis-resource-policy/instruction.md) | Restrict stream access while preserving legitimate producer/consumer access |
+| [`aws/tighten-sqs-redrive-allow-policy`](tasks/aws/tighten-sqs-redrive-allow-policy/instruction.md) | Restrict dead-letter queue sources without breaking existing dependencies |
+
+These three packages were imported unchanged from their canonical exports; they are not
+the ten-task curated selection. They require the platform to provide `AGENT_WORKSPACE`,
+Terraform, and an offline provider mirror. The generic lifecycle runtime does not yet supply
+that Terraform/shared-workspace integration. Source import and static validity do not imply
+these tasks are executable end-to-end today.
 
 ## Execution and grading
 

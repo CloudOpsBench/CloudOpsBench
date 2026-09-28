@@ -11,7 +11,7 @@ AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text --region "$AWS_REGION")}"
 export AWS_DEFAULT_REGION="$AWS_REGION"
 SFX="$AWS_REGION"
-WS="workspaces/aws_task05"
+WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 DLQ="vera-orders-dlq-${SFX}"; MAIN="vera-orders-main-${SFX}"; RETRY="vera-orders-retry-${SFX}"
 DLQ_ARN="arn:aws:sqs:${SFX}:${ACCOUNT_ID}:${DLQ}"
 
@@ -66,3 +66,9 @@ echo "  Out-of-band: ${RETRY} targets ${DLQ} (hidden; not in terraform)"
 echo "==> aws_task05 setup complete"
 echo "    Agent task: tighten ${DLQ} redrive-allow to least privilege so ${MAIN}"
 echo "    can still use it — without severing anything else that legitimately depends on it."
+
+# Private runtime metadata for the portal; do not copy into the agent workspace.
+python3 - <<'PORTAL_STATE'
+import json, os
+json.dump({"region": os.environ["AWS_REGION"]}, open("seed_state.json", "w"), indent=2)
+PORTAL_STATE

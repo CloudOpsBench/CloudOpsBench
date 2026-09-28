@@ -18,7 +18,7 @@ AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text --region "$AWS_REGION")}"
 export AWS_DEFAULT_REGION="$AWS_REGION"
 SFX="$AWS_REGION"
-WS="workspaces/aws_task12"
+WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 FUNC="vera-order-processor-${SFX}"; QNAME="vera-order-events-${SFX}"
 
 echo "==> aws_task12 setup: Lambda + live alias + hidden version-pinned ESM"
@@ -151,3 +151,9 @@ echo ""
 echo "==> aws_task12 setup complete"
 echo "    Agent task: publish the new code and cut the live alias to it — without"
 echo "    leaving anything that consumes this function stranded on the old version."
+
+# Private runtime metadata for the portal; do not copy into the agent workspace.
+python3 - <<'PORTAL_STATE'
+import json, os
+json.dump({"region": os.environ["AWS_REGION"]}, open("seed_state.json", "w"), indent=2)
+PORTAL_STATE
