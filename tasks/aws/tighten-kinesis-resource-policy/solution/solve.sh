@@ -50,4 +50,4 @@ aws kinesis put-resource-policy --resource-arn "$STREAM_ARN" \
   --policy "file://$POLICY_FILE" --region "$AWS_REGION"
 rm -f "$POLICY_FILE"
 
-echo "==> Updated ${STREAM} resource policy"
+echo "==> Solution applied: ${STREAM} resource policy -> producer write only, analytics-consumer reads kept, wide-open grant removed"

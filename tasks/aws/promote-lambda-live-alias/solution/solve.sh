@@ -7,7 +7,7 @@ export AWS_DEFAULT_REGION="$AWS_REGION"
 SFX="$AWS_REGION"
 WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 FUNC="vera-order-processor-${SFX}"
-[ -d "$WS" ] || { echo "workspace $WS missing" >&2; exit 1; }
+[ -d "$WS" ] || { echo "workspace $WS missing — platform setup did not finish" >&2; exit 1; }
 
 terraform -chdir="$WS" init -input=false -no-color >/dev/null
 terraform -chdir="$WS" apply -auto-approve -input=false -no-color >/dev/null
@@ -22,4 +22,4 @@ for _ in $(seq 1 60); do
   [ "$st" = "Enabled" ] && break
   sleep 2
 done
-echo "==> Promoted live alias and repointed the event-source mapping"
+echo "==> Solution applied: new version promoted onto live, hidden ESM repointed to the alias"

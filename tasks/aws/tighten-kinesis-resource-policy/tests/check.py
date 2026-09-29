@@ -124,15 +124,26 @@ outsider_can_write = _assume_can_kinesis_put(outsider_arn, stream, region, retri
 
 problems = []
 if not producer_can_write:
-    problems.append("vera-events-producer cannot PutRecord")
+    problems.append(
+        "vera-events-producer denied PutRecord — the least-privilege write "
+        "grant for the named producer is missing"
+    )
 if not consumer_can_read:
-    problems.append("vera-analytics-consumer cannot read from the stream")
+    problems.append(
+        "vera-analytics-consumer denied GetRecords — the hidden enhanced-fan-out "
+        "consumer was severed (its registration is discoverable via "
+        "kinesis list-stream-consumers; that reverse-lookup was not performed)"
+    )
 if outsider_can_read or outsider_can_write:
-    problems.append("vera-outsider can still access the stream")
+    problems.append(
+        "vera-outsider can still access the stream — the wide-open account-root "
+        "grant was not locked down"
+    )
 
 if not (producer_can_write and consumer_can_read
         and not outsider_can_read and not outsider_can_write):
     fail("; ".join(problems) or "resource policy is not least-privilege")
 
-print(f"OK: {stream} producer can write, analytics consumer can read, outsider denied")
+print(f"OK: {stream} resource policy is least-privilege — producer can write, "
+      f"analytics-consumer can read, outsider denied")
 sys.exit(0)

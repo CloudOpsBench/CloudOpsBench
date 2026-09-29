@@ -23,4 +23,4 @@ PY
 aws sqs set-queue-attributes --queue-url "$DLQ_URL" --attributes "file://$ATTR_FILE"
 rm -f "$ATTR_FILE"
 
-echo "==> Updated ${DLQ} redrive-allow policy"
+echo "==> Solution applied: ${DLQ} redrive-allow -> byQueue permits vera-orders-main + vera-orders-retry"

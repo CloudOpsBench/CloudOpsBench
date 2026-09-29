@@ -12,7 +12,7 @@ SFX="$AWS_REGION"
 WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 FUNC="vera-order-processor-${SFX}"; QNAME="vera-order-events-${SFX}"
 
-echo "==> Setting up Lambda, live alias, and version-pinned SQS mapping"
+echo "==> aws_task12 setup: Lambda + live alias + hidden version-pinned ESM"
 rm -rf "$WS"; mkdir -p "$WS"
 
 cat > "${WS}/provider.tf" <<EOF
@@ -96,7 +96,7 @@ EOF
 
 terraform -chdir="$WS" init -input=false -no-color >/dev/null
 terraform -chdir="$WS" apply -auto-approve -input=false -no-color >/dev/null
-echo "  Applied Terraform: ${FUNC} and live alias"
+echo "  Terraform manages: ${FUNC} (old code published) + live alias"
 
 # SQS queue and event-source mapping pinned to the numbered version, outside Terraform.
 QURL=""
@@ -127,7 +127,7 @@ for _ in $(seq 1 60); do
   [ "$st" = "Enabled" ] && break
   sleep 2
 done
-echo "  Created SQS event-source mapping pinned to ${FUNC}:${OLD_VER}"
+echo "  Out-of-band: SQS ESM pinned to ${FUNC}:${OLD_VER} (hidden; not in terraform)"
 
 # Replace the handler with the new build that the task asks to roll out.
 cat > "${WS}/index.py" <<'EOF'
@@ -136,7 +136,12 @@ def handler(event, context):
     return {"version": "new"}
 EOF
 
-echo "==> Setup complete"
+echo "  Swapped workspace index.py to the new build (pending rollout)"
+
+echo ""
+echo "==> aws_task12 setup complete"
+echo "    Agent task: publish the new code and cut the live alias to it — without"
+echo "    leaving anything that consumes this function stranded on the old version."
 
 # Private runtime metadata for the portal; do not copy into the agent workspace.
 python3 - <<'PORTAL_STATE'

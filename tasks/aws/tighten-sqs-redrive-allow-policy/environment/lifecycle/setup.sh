@@ -10,7 +10,7 @@ WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 DLQ="vera-orders-dlq-${SFX}"; MAIN="vera-orders-main-${SFX}"; RETRY="vera-orders-retry-${SFX}"
 DLQ_ARN="arn:aws:sqs:${SFX}:${ACCOUNT_ID}:${DLQ}"
 
-echo "==> Setting up SQS queues (account $ACCOUNT_ID, region $AWS_REGION)"
+echo "==> aws_task05 setup: SQS redrive-allow + hidden out-of-band consumer (account $ACCOUNT_ID, region $AWS_REGION)"
 rm -rf "$WS"; mkdir -p "$WS"
 
 cat > "${WS}/provider.tf" <<EOF
@@ -45,7 +45,7 @@ EOF
 
 terraform -chdir="$WS" init -input=false -no-color >/dev/null
 terraform -chdir="$WS" apply -auto-approve -input=false -no-color >/dev/null
-echo "  Applied Terraform: ${MAIN}, ${DLQ}"
+echo "  Terraform manages: ${MAIN}, ${DLQ} (DLQ redrive-allow = allowAll)"
 
 # Retry queue created outside Terraform that dead-letters to the DLQ.
 RETRY_URL=$(aws sqs create-queue --queue-name "$RETRY" --query QueueUrl --output text)
@@ -55,9 +55,11 @@ cat >"$REDRIVE_FILE" <<EOF
 EOF
 aws sqs set-queue-attributes --queue-url "$RETRY_URL" --attributes "file://$REDRIVE_FILE" >/dev/null
 rm -f "$REDRIVE_FILE"
-echo "  Created ${RETRY} with ${DLQ} as its dead-letter target"
+echo "  Out-of-band: ${RETRY} targets ${DLQ} (hidden; not in terraform)"
 
-echo "==> Setup complete"
+echo "==> aws_task05 setup complete"
+echo "    Agent task: tighten ${DLQ} redrive-allow to least privilege so ${MAIN}"
+echo "    can still use it — without severing anything else that legitimately depends on it."
 
 # Private runtime metadata for the portal; do not copy into the agent workspace.
 python3 - <<'PORTAL_STATE'

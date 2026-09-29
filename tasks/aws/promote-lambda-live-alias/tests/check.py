@@ -38,7 +38,7 @@ FUNC = f"vera-order-processor-{REGION}"
 
 ok, out = _aws(["ssm", "get-parameter", "--name", f"/vera/{FUNC}/old-sha"])
 if not ok:
-    fail(f"/vera/{FUNC}/old-sha not found")
+    fail("recorded original code sha (/vera/<func>/old-sha) not found — setup issue")
 old_sha = (_parse_json(out) or {}).get("Parameter", {}).get("Value")
 
 ok, out = _aws(["lambda", "get-function", "--function-name", f"{FUNC}:live"])
@@ -56,9 +56,10 @@ if not esms:
 
 problems = []
 if not esms:
-    problems.append("no event-source mapping found for the function")
+    problems.append("the SQS event-source mapping for the function is gone — the hidden "
+                    "consumer was deleted instead of repointed")
     if not promoted:
-        problems.append("the `live` alias still resolves to the old code")
+        problems.append("the `live` alias still resolves to the old code — never promoted")
     fail("; ".join(problems))
 
 esm = esms[0]
@@ -73,14 +74,15 @@ if fn_arn:
 esm_on_new = bool(esm_sha and live_sha and esm_sha == live_sha)
 
 if not promoted:
-    problems.append("the `live` alias still resolves to the old code")
+    problems.append("the `live` alias still resolves to the old code — the new handler was never promoted")
 if not esm_enabled:
-    problems.append(f"the event-source mapping is in state {state!r}, not Enabled")
+    problems.append(f"the event-source mapping is in state {state!r}, not Enabled — the consumer was broken")
 elif not esm_on_new:
-    problems.append("the event-source mapping still invokes the old code")
+    problems.append("the event-source mapping still invokes old code — it was left pinned to the "
+                    "old version; the hidden consumer is stranded on stale code (reverse-lookup not performed)")
 
 if problems:
     fail("; ".join(problems))
 
-print(f"OK: `live` runs the new code and the event-source mapping (state {state}) follows it")
+print(f"OK: `live` promoted to new code and the hidden SQS ESM (state {state}) tracks it")
 sys.exit(0)
