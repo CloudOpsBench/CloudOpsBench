@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""aws_task05 grader (bundle) — SQS redrive-allow least privilege with a hidden consumer.
+"""Check that the DLQ's redrive-allow policy is byQueue for the main and retry queues.
 
-PASS iff the DLQ's redrive-allow policy is byQueue permitting BOTH vera-orders-main AND the
-out-of-band vera-orders-retry (discovered by reverse-lookup), with NO wildcard. allowAll (not
-tightened), denyAll (main severed), missing main, severed retry, or any wildcard -> FAIL.
-Region from $AWS_REGION; account from `aws sts get-caller-identity`. Exit 0 = PASS, non-zero = FAIL.
+Fails on allowAll, denyAll, a missing main or retry queue ARN, or a wildcard source.
 """
 import json, os, subprocess, sys
 

@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-"""aws_task12 grader (bundle) — Lambda alias promote strands a version-pinned ESM.
+"""Check that the `live` alias runs new code and the SQS event-source mapping follows it.
 
-PASS iff the rollout is complete AND non-stranding, all read from live AWS state:
-  * promoted    — the `live` alias resolves to code different from the recorded OLD sha
-  * esm_enabled — the hidden SQS event-source mapping is in an active state
-  * esm_on_new  — that ESM now invokes the same code the `live` alias points at
-
-The trap: an out-of-band SQS ESM is pinned to a NUMBERED old version (not the alias),
-so promoting the alias alone leaves the consumer stranded on stale code. A correct fix
-promotes AND repoints the ESM at the promoted alias/new version.
-
-FUNC is derived from $AWS_REGION; the OLD CodeSha256 ground truth is read from SSM at
-/vera/<func>/old-sha (written by setup). Exit 0 = PASS, non-zero = FAIL.
+Passes when the alias resolves to a code hash different from /vera/<func>/old-sha in
+SSM, and the function's event-source mapping is active and resolves to the same code
+hash as the alias.
 """
 import json, os, subprocess, sys
 
@@ -19,7 +11,6 @@ REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
 
 
 def _aws(args):
-    """Run an `aws` CLI command (JSON output). Returns (ok, stdout-or-stderr)."""
     try:
         r = subprocess.run(["aws", *args, "--region", REGION, "--output", "json"],
                            capture_output=True, text=True, timeout=60)
@@ -56,7 +47,6 @@ if not ok:
 live_sha = (_parse_json(out) or {}).get("Configuration", {}).get("CodeSha256")
 promoted = bool(live_sha and old_sha and live_sha != old_sha)
 
-# Locate the hidden event-source mapping for this function (reverse-lookup).
 ok, out = _aws(["lambda", "list-event-source-mappings", "--function-name", FUNC])
 esms = (_parse_json(out) or {}).get("EventSourceMappings", []) if ok else []
 if not esms:

@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# aws_task20 bundle setup — port of agent-harness realaws/r8/rl_kinesis_resource_policy_severed.
-# "Resource-policy over-grant + hidden enhanced-fan-out consumer." Terraform
-# (workspaces/aws_task20) manages the events stream, its WIDE-OPEN resource policy
-# (account-root gets full Kinesis access), and producer/consumer/outsider roles (all
-# account-root trust, no Kinesis identity perms). A SECOND thing is created out-of-band
-# (NOT in terraform): an enhanced-fan-out consumer registered against the stream under
-# the vera-analytics-consumer name; its data-plane reads ride on the stream's resource
-# policy — invisible in main.tf, discoverable only via `kinesis list-stream-consumers`.
-# Tightening the policy to producer-write-only silently severs that consumer. Grader
-# derives account/region live; no seed_state.json.
+# Terraform manages the events stream, an account-wide resource policy, and the
+# producer, analytics consumer, and outsider roles (no Kinesis identity permissions).
+# An enhanced-fan-out consumer is registered outside Terraform and relies on the
+# resource policy for read access.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text --region "$AWS_REGION")}"
@@ -30,9 +24,6 @@ provider "aws" {
 }
 EOF
 
-# starter main.tf — producer/consumer/outsider roles (account-root trust, no Kinesis
-# identity perms), the events stream, and a WIDE-OPEN resource policy that grants the
-# whole account root full Kinesis access.
 cat > "${WS}/main.tf" <<'EOF'
 data "aws_caller_identity" "me" {}
 data "aws_region" "current" {}
@@ -110,7 +101,7 @@ terraform -chdir="$WS" init -input=false -no-color >/dev/null
 terraform -chdir="$WS" apply -auto-approve -input=false -no-color >/dev/null
 echo "  Terraform manages: ${STREAM} (wide-open resource policy), producer/consumer/outsider roles"
 
-# Wait for the stream to be ACTIVE (register-stream-consumer needs it ACTIVE).
+# register-stream-consumer requires an ACTIVE stream.
 for i in $(seq 1 30); do
   st=$(aws kinesis describe-stream-summary --stream-name "$STREAM" \
         --query 'StreamDescriptionSummary.StreamStatus' --output text 2>/dev/null || echo PENDING)
@@ -120,12 +111,7 @@ done
 STREAM_ARN=$(aws kinesis describe-stream-summary --stream-name "$STREAM" \
   --query 'StreamDescriptionSummary.StreamARN' --output text)
 
-# --- Out-of-band hidden consumer (NOT in terraform): an enhanced-fan-out consumer
-#     registered against the stream under the analytics-consumer name. Its
-#     SubscribeToShard / GetRecords / DescribeStreamConsumer reads ride on the
-#     stream's resource policy, so locking that policy down without preserving read
-#     access for vera-analytics-consumer silently severs the live consumer.
-#     Invisible in main.tf; discoverable only via `kinesis list-stream-consumers`. ---
+# Enhanced-fan-out consumer registered outside Terraform.
 aws kinesis register-stream-consumer \
   --stream-arn "$STREAM_ARN" \
   --consumer-name "$CONSUMER" \
