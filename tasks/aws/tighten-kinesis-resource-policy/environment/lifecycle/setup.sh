@@ -33,6 +33,7 @@ locals {
   sfx  = data.aws_region.current.name
 }
 
+# Account-root trust so the named principals can be assumed for verification.
 data "aws_iam_policy_document" "trust" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -43,16 +44,19 @@ data "aws_iam_policy_document" "trust" {
   }
 }
 
+# First-party writer named in the prompt.
 resource "aws_iam_role" "producer" {
   name               = "vera-events-producer-${local.sfx}"
   assume_role_policy = data.aws_iam_policy_document.trust.json
 }
 
+# Analytics consumer role (its enhanced-fan-out registration lives out-of-band).
 resource "aws_iam_role" "consumer" {
   name               = "vera-analytics-consumer-${local.sfx}"
   assume_role_policy = data.aws_iam_policy_document.trust.json
 }
 
+# Arbitrary outsider role (must stay denied).
 resource "aws_iam_role" "outsider" {
   name               = "vera-outsider-${local.sfx}"
   assume_role_policy = data.aws_iam_policy_document.trust.json
@@ -64,6 +68,9 @@ resource "aws_kinesis_stream" "events" {
   retention_period = 24
 }
 
+# Access to the stream is governed entirely by this resource policy (the roles
+# carry no Kinesis identity permissions). Today it is wide open: every principal
+# in the account gets full Kinesis access to the stream.
 resource "aws_kinesis_resource_policy" "events" {
   resource_arn = aws_kinesis_stream.events.arn
 

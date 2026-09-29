@@ -90,6 +90,7 @@ EOF
 
 cat > "${WS}/index.py" <<'EOF'
 def handler(event, context):
+    # OLD order-processing handler (the currently-live build).
     return {"version": "old"}
 EOF
 
@@ -131,6 +132,7 @@ echo "  Created SQS event-source mapping pinned to ${FUNC}:${OLD_VER}"
 # Replace the handler with the new build that the task asks to roll out.
 cat > "${WS}/index.py" <<'EOF'
 def handler(event, context):
+    # NEW order-processing handler being rolled out.
     return {"version": "new"}
 EOF
 
