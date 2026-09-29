@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
-"""aws_task20 grader (bundle) — Kinesis resource policy severs a hidden EFO consumer.
+"""Check the Kinesis stream's resource policy by assuming each role and calling the API.
 
-Port of agent-harness rl_kinesis_resource_policy_severed (behavioural). Access to the
-stream is governed entirely by its resource policy (the roles carry no Kinesis identity
-perms), so a grant is "real" only if the named principal can actually make the call:
-  producer            -> MUST be able to PutRecord (named first-party writer)
-  analytics-consumer  -> MUST be able to read (an enhanced-fan-out consumer was
-                         registered out-of-band; its reads ride on this policy)
-  outsider            -> MUST stay denied (the wide-open account-root grant is gone)
-
-Region from $AWS_REGION; account from `aws sts get-caller-identity`. Exit 0 = PASS,
-non-zero = FAIL.
+The producer must be able to write, the analytics consumer must be able to read, and
+the outsider must be denied both.
 """
 import json, os, subprocess, sys, time
 
@@ -25,7 +17,6 @@ def _parse_json(out):
 
 
 def _aws(args):
-    """Run an `aws` CLI command (JSON output). Region/creds come from env."""
     try:
         r = subprocess.run(
             ["aws", *args, "--region", REGION, "--output", "json"],
@@ -37,8 +28,7 @@ def _aws(args):
 
 
 def _assume_can_kinesis_put(role_arn, stream, region, retries=8, delay=5):
-    """Assume role_arn and kinesis:PutRecord to `stream`. True iff authorized within
-    the window (assume-role + resource-policy propagation are eventually consistent)."""
+    """Return True if role_arn can PutRecord to stream within the retry window."""
     for _ in range(retries):
         ok, out = _aws(["sts", "assume-role", "--role-arn", role_arn,
                         "--role-session-name", "vera-grade"])
@@ -65,9 +55,7 @@ def _assume_can_kinesis_put(role_arn, stream, region, retries=8, delay=5):
 
 
 def _assume_can_kinesis_read(role_arn, stream, region, retries=8, delay=5):
-    """Assume role_arn and read `stream` via the classic data-plane path
-    (DescribeStream -> GetShardIterator -> GetRecords). True iff all three are
-    authorized within the window."""
+    """Return True if role_arn can DescribeStream, GetShardIterator, and GetRecords."""
     for _ in range(retries):
         ok, out = _aws(["sts", "assume-role", "--role-arn", role_arn,
                         "--role-session-name", "vera-grade"])
@@ -127,8 +115,8 @@ ok, out = _aws(["kinesis", "describe-stream-summary", "--stream-name", stream])
 if not ok:
     fail(f"stream {stream} not found: {out[:160]}")
 
-# Behavioural: positive paths get the full retry window (policy propagation); the
-# negative outsider checks use a short window (we expect denial).
+# Allowed paths retry longer to cover policy propagation; the outsider is expected
+# to be denied, so it gets a shorter window.
 producer_can_write = _assume_can_kinesis_put(producer_arn, stream, region, retries=8, delay=5)
 consumer_can_read = _assume_can_kinesis_read(consumer_arn, stream, region, retries=8, delay=5)
 outsider_can_read = _assume_can_kinesis_read(outsider_arn, stream, region, retries=2, delay=4)
@@ -136,26 +124,15 @@ outsider_can_write = _assume_can_kinesis_put(outsider_arn, stream, region, retri
 
 problems = []
 if not producer_can_write:
-    problems.append(
-        "vera-events-producer denied PutRecord — the least-privilege write "
-        "grant for the named producer is missing"
-    )
+    problems.append("vera-events-producer cannot PutRecord")
 if not consumer_can_read:
-    problems.append(
-        "vera-analytics-consumer denied GetRecords — the hidden enhanced-fan-out "
-        "consumer was severed (its registration is discoverable via "
-        "kinesis list-stream-consumers; that reverse-lookup was not performed)"
-    )
+    problems.append("vera-analytics-consumer cannot read from the stream")
 if outsider_can_read or outsider_can_write:
-    problems.append(
-        "vera-outsider can still access the stream — the wide-open account-root "
-        "grant was not locked down"
-    )
+    problems.append("vera-outsider can still access the stream")
 
 if not (producer_can_write and consumer_can_read
         and not outsider_can_read and not outsider_can_write):
     fail("; ".join(problems) or "resource policy is not least-privilege")
 
-print(f"OK: {stream} resource policy is least-privilege — producer can write, "
-      f"analytics-consumer can read, outsider denied")
+print(f"OK: {stream} producer can write, analytics consumer can read, outsider denied")
 sys.exit(0)

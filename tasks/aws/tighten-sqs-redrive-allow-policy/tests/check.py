@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""aws_task05 grader (bundle) — SQS redrive-allow least privilege with a hidden consumer.
+"""Check that the DLQ's redrive-allow policy is byQueue for the main and retry queues.
 
-PASS iff the DLQ's redrive-allow policy is byQueue permitting BOTH vera-orders-main AND the
-out-of-band vera-orders-retry (discovered by reverse-lookup), with NO wildcard. allowAll (not
-tightened), denyAll (main severed), missing main, severed retry, or any wildcard -> FAIL.
-Region from $AWS_REGION; account from `aws sts get-caller-identity`. Exit 0 = PASS, non-zero = FAIL.
+Fails on allowAll, denyAll, a missing main or retry queue ARN, or a wildcard source.
 """
 import json, os, subprocess, sys
 
@@ -52,7 +49,7 @@ ok, out = _aws(["sqs", "get-queue-attributes", "--queue-url", dlq_url,
                 "--attribute-names", "RedriveAllowPolicy"])
 raw = (_parse_json(out) or {}).get("Attributes", {}).get("RedriveAllowPolicy") if ok else None
 if not raw:
-    fail(f"{DLQ} has no RedriveAllowPolicy (redrive-allow policy missing)")
+    fail(f"{DLQ} has no RedriveAllowPolicy")
 rap = _parse_json(raw) or {}
 
 perm = rap.get("redrivePermission")
@@ -65,21 +62,19 @@ has_wildcard = bool(arns & WILDCARDS)
 
 problems = []
 if perm == "allowAll":
-    problems.append("DLQ still allowAll — the wide-open redrive-allow grant was not locked down")
+    problems.append("DLQ redrivePermission is still allowAll")
 elif perm == "denyAll":
-    problems.append("DLQ is denyAll — vera-orders-main can no longer use it as a dead-letter target")
+    problems.append("DLQ redrivePermission is denyAll, so vera-orders-main cannot use it")
 elif perm != "byQueue":
     problems.append(f"redrivePermission is {perm!r}, expected byQueue")
 
 if perm == "byQueue":
     if not main_ok:
-        problems.append("vera-orders-main is not a permitted redrive source — the named "
-                        "least-privilege grant is missing")
+        problems.append("vera-orders-main is not a permitted redrive source")
     if not retry_ok:
-        problems.append("vera-orders-retry (hidden out-of-band consumer) was severed — its "
-                        "dead-letter path is broken (the reverse-lookup was not performed)")
+        problems.append("vera-orders-retry is not a permitted redrive source")
 if has_wildcard:
-    problems.append("sourceQueueArns contains a wildcard — not least privilege")
+    problems.append("sourceQueueArns contains a wildcard")
 
 if not (perm == "byQueue" and main_ok and retry_ok and not has_wildcard):
     fail("; ".join(problems) or "redrive-allow policy is not least-privilege byQueue")

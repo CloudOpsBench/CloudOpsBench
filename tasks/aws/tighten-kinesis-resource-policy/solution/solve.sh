@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# Portal adapter: inlined CloudOpsBench solution/golden.sh; use platform credentials.
-# Golden reference solution for aws_task20 (deterministic, no model). Tightens the
-# events-stream resource policy to least privilege: the producer may write
-# (PutRecord/PutRecords), the hidden enhanced-fan-out consumer (vera-analytics-consumer,
-# the reverse-lookup discovery) keeps its reads, and the wide-open account-root grant is
-# removed (so an outsider is denied). Sets the policy DIRECTLY via the Kinesis API
-# (put-resource-policy) — NO `terraform apply`, so the golden never depends on setup's
-# tfstate/provider-cache being present in this phase and never re-plans the stream
-# (which, with a missing state, would try to RE-CREATE the existing stream and crash).
-# The grader is behavioural (assumes each role and makes real calls); teardown deletes
-# resources by name, so a CLI-applied policy is fully covered. CWD = runspace root.
+# Replace the stream's resource policy with producer write access and analytics
+# consumer read access. Uses the Kinesis API directly rather than Terraform so it
+# does not depend on the setup phase's Terraform state.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 export AWS_DEFAULT_REGION="$AWS_REGION"
@@ -58,4 +50,4 @@ aws kinesis put-resource-policy --resource-arn "$STREAM_ARN" \
   --policy "file://$POLICY_FILE" --region "$AWS_REGION"
 rm -f "$POLICY_FILE"
 
-echo "==> Solution applied: ${STREAM} resource policy -> producer write only, analytics-consumer reads kept, wide-open grant removed"
+echo "==> Updated ${STREAM} resource policy"

@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
-# aws_task12 bundle setup — port of agent-harness realaws/r9/rl_lambda_alias_promote_strands_esm.
-# "Promote/prune strands a version-pinned consumer." A Lambda is rolled out by
-# publishing a new version and moving the `live` alias. The trap: a hidden SQS
-# event-source mapping (ESM) is pinned to a SPECIFIC numbered version (the OLD
-# code), NOT the alias — so promoting the alias leaves the ESM invoking stale code.
-# The ESM is out-of-band (not in main.tf); discoverable only by reverse-lookup
-# (lambda list-event-source-mappings -> its FunctionArn qualifier). Correct fix
-# promotes the alias AND repoints the ESM at the promoted alias/new version.
-# Ground truth (old CodeSha256) is recorded in SSM at /vera/<func>/old-sha.
-#
-# NOTE: the agent-harness exec role carries a vera-sandbox-boundary permissions
-# boundary that does not exist in this sandbox, so it is omitted (a rail, not the
-# mechanism).
+# Deploys a Lambda with a `live` alias via Terraform, then creates an SQS
+# event-source mapping outside Terraform that is pinned to the current numbered
+# version rather than the alias. The old CodeSha256 is stored in SSM at
+# /vera/<func>/old-sha for the checker.
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
@@ -21,7 +12,7 @@ SFX="$AWS_REGION"
 WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 FUNC="vera-order-processor-${SFX}"; QNAME="vera-order-events-${SFX}"
 
-echo "==> aws_task12 setup: Lambda + live alias + hidden version-pinned ESM"
+echo "==> Setting up Lambda, live alias, and version-pinned SQS mapping"
 rm -rf "$WS"; mkdir -p "$WS"
 
 cat > "${WS}/provider.tf" <<EOF
@@ -97,18 +88,16 @@ resource "aws_lambda_alias" "live" {
 }
 EOF
 
-# OLD handler — the currently-live build.
 cat > "${WS}/index.py" <<'EOF'
 def handler(event, context):
-    # OLD order-processing handler (the currently-live build).
     return {"version": "old"}
 EOF
 
 terraform -chdir="$WS" init -input=false -no-color >/dev/null
 terraform -chdir="$WS" apply -auto-approve -input=false -no-color >/dev/null
-echo "  Terraform manages: ${FUNC} (old code published) + live alias"
+echo "  Applied Terraform: ${FUNC} and live alias"
 
-# --- Out-of-band: SQS queue + an ESM pinned to the numbered OLD version ------
+# SQS queue and event-source mapping pinned to the numbered version, outside Terraform.
 QURL=""
 for _ in $(seq 1 40); do
   if QURL=$(aws sqs create-queue --queue-name "$QNAME" --query QueueUrl --output text 2>/dev/null); then break; fi
@@ -137,20 +126,15 @@ for _ in $(seq 1 60); do
   [ "$st" = "Enabled" ] && break
   sleep 2
 done
-echo "  Out-of-band: SQS ESM pinned to ${FUNC}:${OLD_VER} (hidden; not in terraform)"
+echo "  Created SQS event-source mapping pinned to ${FUNC}:${OLD_VER}"
 
-# Swap index.py to the NEW build — "the new handler is in index.py", ready to roll out.
+# Replace the handler with the new build that the task asks to roll out.
 cat > "${WS}/index.py" <<'EOF'
 def handler(event, context):
-    # NEW order-processing handler being rolled out.
     return {"version": "new"}
 EOF
-echo "  Swapped workspace index.py to the new build (pending rollout)"
 
-echo ""
-echo "==> aws_task12 setup complete"
-echo "    Agent task: publish the new code and cut the live alias to it — without"
-echo "    leaving anything that consumes this function stranded on the old version."
+echo "==> Setup complete"
 
 # Private runtime metadata for the portal; do not copy into the agent workspace.
 python3 - <<'PORTAL_STATE'

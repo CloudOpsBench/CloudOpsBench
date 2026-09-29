@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
-# Portal adapter: inlined CloudOpsBench solution/golden.sh; use platform credentials.
-# Golden reference solution for aws_task05 (deterministic, no model). Tightens the DLQ's
-# redrive-allow to byQueue permitting BOTH vera-orders-main AND the hidden vera-orders-retry
-# (the reverse-lookup discovery). Sets the attribute DIRECTLY via the SQS API — no
-# `terraform apply`, so the golden never depends on setup's tfstate/provider-cache being
-# present in this phase and never re-plans the queue (which, with a missing state, would try
-# to RE-CREATE an existing queue and crash). The grader reads the live RedriveAllowPolicy;
-# teardown deletes queues by name, so a CLI-applied policy is fully covered.
-# CWD = runspace root.
+# Set the DLQ's redrive-allow policy to byQueue for the main and retry queues. Uses
+# the SQS API directly rather than Terraform so it does not depend on the setup
+# phase's Terraform state.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 export AWS_DEFAULT_REGION="$AWS_REGION"
@@ -29,4 +23,4 @@ PY
 aws sqs set-queue-attributes --queue-url "$DLQ_URL" --attributes "file://$ATTR_FILE"
 rm -f "$ATTR_FILE"
 
-echo "==> Solution applied: ${DLQ} redrive-allow -> byQueue permits vera-orders-main + vera-orders-retry"
+echo "==> Updated ${DLQ} redrive-allow policy"
