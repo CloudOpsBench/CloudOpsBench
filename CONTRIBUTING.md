@@ -36,7 +36,7 @@ include oracle and negative-control execution evidence before claiming a task is
 5. Update affected documentation and complete the PR checklist. State what was not tested and why.
 6. Request review; address reproducibility, safety, and verifier correctness feedback before merge.
 
-Do not present static checks as end-to-end validation. Contributions are under the repository's [MIT license](LICENSE).
+Do not present static checks as end-to-end validation. Contributions are under the repository's [Apache License 2.0](LICENSE).
 
 ## Task submission checklist
 
