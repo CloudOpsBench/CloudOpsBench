@@ -79,4 +79,4 @@ python3 scripts/validate.py
 ```
 
 Static checks are not execution tests. See the [validation procedure](docs/smoke-test.md)
-and [roadmap](docs/roadmap.md). Public content is under the [MIT license](LICENSE).
+and [roadmap](docs/roadmap.md). Public content is under the [Apache License 2.0](LICENSE).
