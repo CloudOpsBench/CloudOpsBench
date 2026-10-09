@@ -42,7 +42,7 @@ The repository currently holds 45 tasks:
 | [`aws/decommission-analytics-environment`](tasks/aws/decommission-analytics-environment/instruction.md) | Tear down a finished analytics environment by removing every resource named with its prefix |
 | [`aws/decommission-customer-portal`](tasks/aws/decommission-customer-portal/instruction.md) | Remove everything belonging to the retired customer portal from the account while keeping the billing workload intact |
 | [`aws/decommission-data-pipeline`](tasks/aws/decommission-data-pipeline/instruction.md) | Fully decommission the deprecated adt- data pipeline by removing every resource that carries its name prefix |
-| [`aws/decommission-event-driven-workload`](tasks/aws/decommission-event-driven-workload/instruction.md) | Fully dismantle the retired aeb-<region> event-driven workload so that no resource with that prefix remains anywhere |
+| [`aws/decommission-event-driven-workload`](tasks/aws/decommission-event-driven-workload/instruction.md) | Fully dismantle the retired `aeb-<region>` event-driven workload so that no resource with that prefix remains anywhere |
 | [`aws/delete-decommissioned-s3-buckets`](tasks/aws/delete-decommissioned-s3-buckets/instruction.md) | Delete every vera2 S3 bucket in us-east-1 as part of decommissioning the project |
 | [`aws/delete-pilot-ebs-volumes`](tasks/aws/delete-pilot-ebs-volumes/instruction.md) | Delete the retired vera2 pilot's EBS volumes and leave other teams' volumes alone |
 | [`aws/delete-pilot-images`](tasks/aws/delete-pilot-images/instruction.md) | Delete the finished vera2 pilot's images so that no vera2- image remains in the account |
