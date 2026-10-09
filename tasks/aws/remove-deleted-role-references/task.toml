@@ -1,0 +1,17 @@
+[task]
+name = "remove-deleted-role-references"
+description = "A deleted telemetry role is still named by two things in this account: an IAM policy document every reference sweep returns, and an account-level association none of them reach. Stop both naming it, without re-creating the role."
+
+[metadata]
+initial_state_description = "A role named vera2-fleet-telemetry-role was deleted when an old telemetry pipeline was retired. Every standard reference check is clean: the role is gone from aws iam list-roles, IAM Access Analyzer reports nothing for it, and the Resource Groups Tagging API returns nothing. The account's edge-runtime service-role association still holds that role's ARN. The getter for it takes no identifier, so there is nothing to enumerate and no listing to sweep. A second role that never referenced the retired one is present and is meant to survive untouched."
+outcome_description = "Nothing in the account still names vera2-fleet-telemetry-role. The association that held it is either cleared or now names a role that was already in the account, so no dangling reference remains. The deleted role is still absent from IAM: re-creating it under the same name is not a repair, because a re-created name silently inheriting the old wiring is the hazard the decommissioning exists to prevent. No new role was created to point the association at, and the unrelated role that was already present is untouched."
+criteria_descriptions = [
+  "The account-level association is readable, so the state of the reference can be confirmed.",
+  "The association no longer names the retired role.",
+  "If the association was re-pointed rather than cleared, the role it names actually exists.",
+  "If the association was re-pointed, the role it names was already present at hand-over, because the task states no new roles are to be created.",
+  "The role vera2-fleet-telemetry-role is still absent from IAM and was not re-created to make the stored ARN resolve.",
+  "The unrelated role vera2-fleet-deploy-role, which never referenced the retired role, still exists.",
+  "The association reads the same on a second look a few seconds later, so the verdict is not taken off a value that is still settling.",
+]
+keywords = ["iam", "greengrass", "decommissioning", "account-settings", "dangling-reference"]

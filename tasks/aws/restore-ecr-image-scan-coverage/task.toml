@@ -1,0 +1,39 @@
+[task]
+name = "restore-ecr-image-scan-coverage"
+description = "Restore vulnerability scanning coverage across a container registry"
+
+[metadata]
+
+initial_state_description = """
+An Amazon ECR registry in us-east-1 holds four application repositories and one upstream
+mirror repository, all tagged Project=scanpolicy-demo. Every repository reads scanOnPush=true
+at the repository level, while the registry's own scanning configuration names only the
+payments repository, so the other four are left on the manual scan frequency and are never
+scanned on push. An EventBridge rule on the default bus forwards ECR image scan events to an
+SNS topic, but its event pattern is scoped to the payments repository alone. Two further
+repositories in the same registry belong to a different team, are tagged Project=data-platform,
+and are covered by a second filter inside that same single scanning rule. A fifth application
+repository, tagged the same way, lives in the registry of the region the account's ECR
+replication configuration names as its destination, and that region's registry scanning
+configuration is empty."""
+
+outcome_description = """
+Every application repository the team owns is scanned automatically on every push in both
+registries and the upstream mirror repository is not, the other team's two repositories still
+are, and a completed image scan in any application repository is
+forwarded to the security SNS topic by an enabled rule on the default event bus that the
+topic's policy admits. The registry stays on basic scanning with Amazon
+Inspector and enhanced scanning disabled, and no repository is deleted or replaced. Any route
+to that end state counts: the console, the CLI, an SDK or infrastructure code are all
+acceptable, and the filters and event pattern may take any shape that produces it."""
+
+criteria_descriptions = [
+  "all five seeded repositories still exist with their original ARN, creation time, encryption configuration and tag mutability",
+  "the registry scan type is still BASIC in both regions, so Amazon Inspector and enhanced scanning were not enabled",
+  "the registry scanning configuration of the replication destination region covers the application repository that lives there",
+  "the registry scanning configuration puts each of the four application repositories on automatic on-push scanning",
+  "no registry scanning filter matches the upstream mirror repository, so it stays off automatic scanning",
+  "the two data-platform repositories, owned by another team, are still matched by a SCAN_ON_PUSH filter",
+  "the security SNS topic still exists, and its policy admits the rule that does the routing, conditions included",
+  "an enabled EventBridge rule on the default bus targets the security topic and, per TestEventPattern, matches both a with-findings and a no-findings completed ECR image scan event for each of the four application repositories",
+]

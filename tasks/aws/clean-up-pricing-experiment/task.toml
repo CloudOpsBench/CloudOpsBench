@@ -1,0 +1,48 @@
+[task]
+name        = "clean-up-pricing-experiment"
+description = "Remove a finished pricing experiment, including the query results it left in a shared bucket"
+
+[metadata]
+initial_state_description = """
+A finished Q1 price elasticity test still has its footprint in the account. Its ad-hoc analysis ran
+in a dedicated Athena workgroup whose result location points at a prefix inside a shared analytics
+results bucket, and every query the analysts ran wrote its returned rows there, so those result sets
+are a full copy of the customer data the experiment touched. That bucket is versioned and Finance's
+weekly revenue reporting writes its own results into a separate prefix in the same bucket, through
+its own access point and its own workgroup. An S3 access point fronts the experiment's prefix, an
+unfinished cohort export sits there as a multipart upload that was never completed, the pricing API
+key the experiment ran with is in Secrets Manager, and the experiment queried as its own IAM role.
+"""
+
+outcome_description = """
+Nothing the pricing experiment produced or used is left in the account. Every result set its queries
+wrote is gone from the analytics bucket, including the delete markers a plain delete would leave over
+them, since that bucket is versioned and hiding an object is not removing it. The unfinished cohort
+export is aborted rather than left as pending parts no listing shows. The access point that fronted
+the prefix, the Athena workgroup and the query role are all gone, and the pricing API key is
+destroyed outright rather than scheduled for deletion with its value still restorable. Deleting the
+workgroup is not a correct answer on its own: the result sets live in the shared bucket, not inside
+the workgroup, so they survive it untouched. The analytics bucket itself still exists and Finance's
+weekly revenue reporting still has its results, its access point, its workgroup, its warehouse
+credentials and its role, because that job still runs every Monday.
+"""
+
+criteria_descriptions = [
+  "keeper: the shared analytics results bucket still exists",
+  "keeper: Finance's weekly revenue results are still present under their prefix",
+  "keeper: no delete marker was written over Finance's prefix",
+  "keeper: Finance's S3 access point still exists",
+  "keeper: Finance's Athena workgroup still exists",
+  "keeper: Finance's warehouse DSN secret still resolves and is not scheduled for deletion",
+  "keeper: Finance's reporting IAM role still exists",
+  "no object versions remain under the experiment's prefix in the analytics bucket",
+  "no delete markers remain over the experiment's prefix",
+  "no unfinished multipart upload remains under the experiment's prefix",
+  "the S3 access point fronting the experiment's prefix no longer exists",
+  "the experiment's Athena workgroup no longer exists",
+  "the pricing API key secret no longer resolves, i.e. it was destroyed rather than scheduled for deletion",
+  "the experiment's query IAM role no longer exists",
+]
+
+keywords    = ["decommissioning", "s3", "athena", "versioning", "data-retention"]
+extra_tools = []

@@ -1,0 +1,9 @@
+id     = "ext_archit_decommission_data"
+name   = "Full decommission (AWS): orphans hide cross-region and in niche data services (Kinesis/ECR)"
+cloud  = "aws"
+source = "archit_decommission_data.zip"
+
+# prompt uses {account_id} only; the legacy {prefix} was a per-run random value the portal
+# can't fill, so the prompt now names the stable `adt-` prefix stem literally (every run's
+# resources are adt-<hex>-*). No literal braces remain, so opt into substitution.
+prompt_placeholders = true

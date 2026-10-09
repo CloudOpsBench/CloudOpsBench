@@ -1,0 +1,29 @@
+[task]
+name        = "rotate-exposed-webhook-signing-key"
+description = "Replace an exposed vendor webhook signing key and stop the old value resolving anywhere"
+
+[metadata]
+initial_state_description = """
+A webhook relay platform keeps its vendor signing key in a Secrets Manager secret in
+us-east-1, and ECS task definition families named relay-webhook-* read that key from
+Secrets Manager when their tasks run. The key currently stored has been exposed and has to
+be replaced. A second secret belonging to the payouts team sits alongside it and must not
+be altered. Nothing is erroring: every workload resolves its key today, and the exposed
+value is simply the one being served.
+"""
+outcome_description = """
+The secret holds a new signing key in the same JSON shape, the exposed value can no longer
+be obtained from that secret under any version stage, and every ECS task definition family
+named relay-webhook-*, including any older revision still active, resolves the same new
+key rather than the exposed one while still reading it from a Secrets Manager secret.
+The payouts team's secret is untouched, value and version stages alike. Any route that
+achieves this is acceptable.
+"""
+criteria_descriptions = [
+  "The secret's current value is a new signing key in a JSON object under the signing_key field, not the exposed one.",
+  "No version stage on the us-east-1 secret returns the exposed value.",
+  "No ECS task definition family named relay-webhook-*, including older revisions still active, resolves the exposed value.",
+  "Every one of those families, including every revision that stays active, resolves the same new key and still reads it from a Secrets Manager secret.",
+  "The payouts team's secret still holds its original value and the same version stages.",
+]
+keywords = ["secretsmanager", "ecs", "credential-rotation", "version-pinning"]

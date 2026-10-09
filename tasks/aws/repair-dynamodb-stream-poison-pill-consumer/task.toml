@@ -1,0 +1,24 @@
+[task]
+name = "repair-dynamodb-stream-poison-pill-consumer"
+description = "Repair a revisioned DynamoDB Streams consumer with atomic projection/receipts and all-or-none cross-entity transaction envelopes"
+
+[metadata]
+initial_state_description = """
+A tagged Python Lambda consumes a NEW_AND_OLD_IMAGES DynamoDB stream, maintains a projection table and immutable mutation receipts, but treats event_id as idempotency, leaves started markers, ignores receipts/transaction envelopes, and has unsafe event-source failure settings. The package also exposes a healthy compat-v1 path.
+"""
+outcome_description = """
+Only lambda_function.py and the existing mapping's failure controls change. Standalone and transaction-envelope records preserve monotone projection state and immutable receipts; complete transaction groups commit atomically or fail without partial state, legacy one-sided pairs are reconciled, poison/malformed/conflicting delivery remains failed, and frozen infrastructure/package state is preserved.
+"""
+criteria_descriptions = [
+  "preserve all frozen DynamoDB/Lambda/IAM/package/S3 state and the existing source-stream consumer topology, including non-repairable mapping fields",
+  "preserve compat-v1 while changing only lambda_function.py in the existing $LATEST package",
+  "repair the existing mapping in place with ReportBatchItemFailures, bisection, exactly two retries, 3600-second record age, and the retained S3 failure destination",
+  "maintain operation-aware monotone live/delete projection ordering with exact replay and stale-delivery safety",
+  "atomically pair every state-advancing mutation with its immutable receipt and safely reconcile exact one-sided legacy pairs",
+  "process a complete tx_id envelope all-or-none across every member's projection and receipt state",
+  "reject incomplete/inconsistent transaction envelopes and make any poison, malformed, conflicting, or non-monotonic member fail the whole identifiable transaction group without side effects",
+  "use stream SequenceNumber for identifiable partial failures and fail the whole invocation when a failed record is not safely identifiable",
+  "remain correct under replay and overlapping invocations without split projection/receipt state, rollback, or resurrection"
+]
+keywords = ["dynamodb", "dynamodb-streams", "lambda", "transaction", "TransactWriteItems", "poison-pill", "idempotency", "revision", "receipt", "partial-batch-response", "ReportBatchItemFailures", "concurrency", "s3"]
+extra_tools = []

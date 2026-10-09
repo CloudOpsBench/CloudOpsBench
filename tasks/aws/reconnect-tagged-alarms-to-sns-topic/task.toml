@@ -1,0 +1,17 @@
+[task]
+name = "reconnect-tagged-alarms-to-sns-topic"
+description = "Wire tagged CloudWatch alarms back to their SNS notification topic"
+
+[metadata]
+initial_state_description = """
+The account contains CloudWatch alarms tagged App=nightbell that must notify an SNS topic also tagged App=nightbell. A failover drill removed the alarm actions from at least one of those alarms, leaving on-call deaf to real breaches. The account also contains a decoy alarm tagged App=drill and other unrelated alarms that must not be touched."""
+
+outcome_description = """
+Every CloudWatch alarm tagged App=nightbell in every region notifies the SNS topic tagged App=nightbell in its region. All other alarms — including the App=drill decoy and any unrelated alarms — retain their original configuration exactly as it was before the fix."""
+
+criteria_descriptions = [
+  "every CloudWatch alarm tagged App=nightbell has at least one alarm action pointing to the SNS topic tagged App=nightbell in the same region",
+  "no App=nightbell alarm is missing its notification action",
+  "the App=drill decoy alarm and all other unrelated alarms are unchanged",
+  "the fix works across all regions where App=nightbell alarms exist, including cross-region composite alarms",
+]
