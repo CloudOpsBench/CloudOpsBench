@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Limits the CodeDeploy role to the live alias and alarm reads, points the alias
+# at the stable version, rescopes the alarm to the alias, and enables canary
+# deployment with alarm-based automatic rollback. Tags the resources.
 set -euo pipefail
 CONTEXT="${AGENT_WORKSPACE:-.}/task_context.json"
 [ -f "$CONTEXT" ] || CONTEXT=task_context.json

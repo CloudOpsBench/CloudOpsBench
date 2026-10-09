@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the account-level subscription filter policies, /svc/ log groups,
+# audit-relay-* streams and relay roles in both regions.
 set -uo pipefail
 # Log group names start with "/"; keep Git Bash from rewriting them as Windows paths.
 export MSYS_NO_PATHCONV=1

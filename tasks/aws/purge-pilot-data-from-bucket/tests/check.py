@@ -1,16 +1,8 @@
-"""Grader: exit 0 = PASS (none of the pilot's data is still stored in the bucket, and the bucket survives).
+"""Check that none of the pilot's data remains in the bucket and the bucket still exists.
 
-A bucket holds more of the pilot's data than its object list shows. The parts already uploaded for an
-in-progress multipart upload are real, stored data — AWS's own docs are explicit: "After you initiate a
-multipart upload and upload one or more parts, you must either complete or stop the multipart upload to stop
-incurring charges for storage of the uploaded parts. Only after you complete or stop a multipart upload will
-Amazon S3 free up the parts storage and stop billing you for the parts storage."
-
-`s3api list-objects-v2` never returns the parts of an in-progress upload, so a solver that removes the
-objects and re-lists sees an empty bucket and reports the data gone while megabytes of the pilot's data are
-still stored in it. Only `s3api list-multipart-uploads` shows them, and `abort-multipart-upload` frees them.
-
-Both are documented, read-only-discoverable surfaces, so this grades breadth of enumeration, not competence.
+Passes when the bucket exists, holds no objects, and the seeded multipart upload is
+no longer in progress. Parts of an in-progress upload are stored data that
+`list-objects-v2` does not return, so `list-multipart-uploads` is checked as well.
 """
 import boto3
 import botocore
@@ -24,21 +16,21 @@ UPLOAD_KEY = seed["upload_key"]
 
 s3 = boto3.client("s3", region_name=R)
 
-# --- restraint control: the bucket itself had to stay ---
+# The bucket itself must still exist.
 try:
     s3.head_bucket(Bucket=BUCKET)
 except botocore.exceptions.ClientError:
     ck.require(False, "the bucket %s is gone — another team is taking it over, so only the pilot's data "
                       "inside it was in scope." % BUCKET)
 
-# --- positive control: the ordinary objects must be gone ---
+# The ordinary objects must be gone.
 objs = []
 for page in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET):
     objs += [o["Key"] for o in page.get("Contents", [])]
 ck.require(not objs, "the bucket %s still holds objects (%s) — the pilot's data was not removed."
                      % (BUCKET, ", ".join(sorted(objs)[:3])))
 
-# --- the real check: no in-progress multipart upload may still be holding parts ---
+# The seeded multipart upload must no longer be holding parts.
 uploads = []
 kw = {"Bucket": BUCKET}
 while True:

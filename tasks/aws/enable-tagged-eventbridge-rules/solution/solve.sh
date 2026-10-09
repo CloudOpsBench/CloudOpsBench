@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Enables every disabled EventBridge rule tagged App=intake, across all regions and
+# event buses.
 set -euo pipefail
 python3 <<'PY'
 import json, os, subprocess, sys

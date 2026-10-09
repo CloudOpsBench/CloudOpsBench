@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Grader (control-plane read, deterministic).
+"""Check that the order-error alarm threshold is lowered and will not be reverted.
 
-The alarm's Threshold is 1000, so it pages far too late. Setting it to 100 looks fixed, but a separate
-EventBridge Scheduler schedule writes the alarm definition back with Threshold=1000 on a recurring cadence.
-The durable fix removes/disables that schedule AND sets the threshold to 100, keeping the same alarm on the
-same namespace/metric with a GreaterThanOrEqualToThreshold comparison.
-
-PASS iff the alarm exists as a GreaterThanOrEqualToThreshold alarm on the seeded namespace/metric with a
-threshold in [1,100] AND no enabled schedule would write it back with a threshold > 100.
+Passes when the seeded alarm still exists on its namespace and metric with a
+GreaterThanOrEqualToThreshold comparison and a threshold in [1, 100], and no enabled
+EventBridge Scheduler schedule rewrites it with a threshold above 100.
 """
 import json
 

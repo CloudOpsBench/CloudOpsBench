@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cleanup. Never fails; every step best-effort.
+# Best-effort cleanup of the subscription, queue and topic; never fails.
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
 

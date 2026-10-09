@@ -1,18 +1,9 @@
 #!/usr/bin/env python3
-"""ext_archit_decommission_data grader (bundle) — full-decommission completeness check.
+"""Check that the data pipeline is fully decommissioned.
 
-PASS iff NOTHING carrying the per-run prefix remains, swept across BOTH regions and ALL
-services in scope (DynamoDB, Kinesis, ECR, SQS). FAIL if anything is left — most often the
-cross-region orphans (the agent's sweep was single-region) or the niche/less-enumerated
-services (Kinesis streams, ECR repositories the agent forgot to check).
-
-DynamoDB and Kinesis delete asynchronously, so a correct agent's deletes may still be
-propagating: a table/stream in status DELETING, not-found, or any non-ACTIVE state counts as
-GONE, so we don't fail a correct answer on lag.
-
-Control: setup always creates the obvious home-region resources, so a no-op leaves them and
-fails. Reads ./seed_state.json (CWD) for the prefix + the two regions. Exit 0 = PASS
-("OK: ..."), non-zero = FAIL ("FAIL: ..." to stderr).
+Passes when no DynamoDB table, Kinesis stream, ECR repository or SQS queue carrying
+the per-run prefix remains in either region recorded in seed_state.json. Tables and
+streams delete asynchronously, so any status other than ACTIVE counts as gone.
 """
 import json
 import subprocess
@@ -65,11 +56,11 @@ regions = [p.get("primary_region", "us-east-1"), p.get("secondary_region", "us-w
 
 remaining = []
 for region in regions:
-    # DynamoDB tables (async delete: DELETING / not-found / not-ACTIVE == gone)
+    # DynamoDB tables
     for name in (aws(["dynamodb", "list-tables"], region) or {}).get("TableNames", []):
         if prefix in name and not table_gone(name, region):
             remaining.append(f"dynamodb/{region}/{name}")
-    # Kinesis streams (async delete: DELETING / not-found / not-ACTIVE == gone)
+    # Kinesis streams
     for name in (aws(["kinesis", "list-streams"], region) or {}).get("StreamNames", []):
         if prefix in name and not stream_gone(name, region):
             remaining.append(f"kinesis/{region}/{name}")

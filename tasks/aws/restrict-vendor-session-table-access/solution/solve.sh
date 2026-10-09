@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# In every region, finds the Glue jobs, CodeBuild projects and ECS services that assume
+# dataex-access-role with a stored session policy and replaces that policy with one that
+# allows reads on the catalog table only.
 set -euo pipefail
 python3 - <<'PY'
 import json, time, boto3, botocore
@@ -18,7 +21,7 @@ ec2 = boto3.client("ec2", region_name=HOME)
 regions = [r["RegionName"] for r in ec2.describe_regions()["Regions"]]
 
 for region in regions:
-    # ---- Glue jobs that pass a scoping document when assuming the shared role
+    # Glue jobs that pass a scoping document when assuming the shared role
     glue = boto3.client("glue", region_name=region)
     try:
         jobs = []
@@ -42,7 +45,7 @@ for region in regions:
         glue.update_job(JobName=job["Name"], JobUpdate=update)
         print("narrowed glue job %s in %s" % (job["Name"], region))
 
-    # ---- CodeBuild projects that do the same
+    # CodeBuild projects that do the same
     cb = boto3.client("codebuild", region_name=region)
     try:
         names = []

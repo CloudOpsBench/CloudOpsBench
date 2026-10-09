@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Reference fix. Discovers everything at runtime; never reads seed_state.json.
+# Rewrites the registry scanning configuration in each region so every application
+# repository is scanned on push (keeping other teams' filters and excluding the
+# mirror), then widens the EventBridge rule that forwards scan events to the
+# security topic.
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
@@ -62,7 +65,7 @@ PYW
 done
 
 
-# Widen the findings-routing rule so it forwards scans for every repository, not just one.
+# Widen the rule that targets the security topic so it matches scans for every repository.
 TOPIC_ARN="$(aws sns list-topics --region "$REGION" --query "Topics[?contains(TopicArn,':sec-scan-findings-')].TopicArn | [0]" --output text)"
 [ -n "$TOPIC_ARN" ] && [ "$TOPIC_ARN" != "None" ] || { echo "security topic not found" >&2; exit 1; }
 

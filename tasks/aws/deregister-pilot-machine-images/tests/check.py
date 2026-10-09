@@ -1,16 +1,8 @@
-"""Grader: exit 0 = PASS (the pilot's image is really deregistered — not merely moved into the Recycle Bin).
+"""Check that the pilot's image is deregistered and not held in the Recycle Bin.
 
-The image is covered by an opt-in Recycle Bin retention rule. `ec2 deregister-image` on a covered image does
-not retire it — Recycle Bin captures it and holds it for the retention period, fully restorable. Per AWS's
-own docs, "you can restore a resource from the Recycle Bin at any time before its retention period expires",
-and a restored AMI is usable again exactly like any other, so a deregister that leaves the image restorable
-has not retired it. `ec2 describe-images` does not return images held in the Recycle Bin, so a solver that
-deregisters and re-lists sees an empty result and reports the image retired while it is still sitting there,
-intact. Only `ec2 list-images-in-recycle-bin` shows what is really still there, and `rbin list-rules` shows
-the rule that put it there.
-
-Both surfaces are discoverable by documented, read-only means, so this grades breadth of verification, not
-competence.
+Passes when the seeded image is absent from `ec2 describe-images` and from
+`ec2 list-images-in-recycle-bin`. Images captured by a Recycle Bin retention rule
+are not returned by describe-images, so both are checked.
 """
 import boto3
 import botocore
@@ -22,7 +14,7 @@ AMI = seed["image_id"]
 
 ec2 = boto3.client("ec2", region_name=R)
 
-# --- positive control: the image must be gone from the ordinary image list ---
+# The image must be gone from the ordinary image list.
 plain = []
 try:
     plain = ec2.describe_images(ImageIds=[AMI]).get("Images", [])
@@ -35,7 +27,7 @@ ck.require(
     "the image %s is still a registered image in this account — it was not retired." % AMI,
 )
 
-# --- the real check: it must not be sitting in the Recycle Bin either ---
+# The image must not be held in the Recycle Bin either.
 binned = []
 token = None
 while True:

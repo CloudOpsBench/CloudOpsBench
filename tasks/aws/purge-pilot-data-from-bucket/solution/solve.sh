@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Removes all objects from the vera2- buckets and aborts their in-progress
+# multipart uploads, leaving the buckets in place.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""ext_archit_decommission_analytics grader (bundle) — full-decommission completeness check.
+"""Check that nothing carrying the stack prefix remains in either region.
 
-State-only. PASS iff NOTHING carrying the prefix remains, swept across BOTH regions and ALL
-services in scope (Athena work-groups, Secrets Manager, SSM, SQS). FAIL if anything is left —
-most often the cross-region orphans (a single-region sweep misses them) or the niche Athena
-work-group (agents almost never enumerate Athena). Setup always creates the obvious home-region
-resources, so a no-op leaves them and fails. Reads ./seed_state.json (CWD) for the prefix + the
-two regions. Exit 0 = PASS ("OK: ..."), non-zero = FAIL ("FAIL: ..." to stderr).
+Reads the prefix and the two regions from ./seed_state.json and passes when no Athena
+work-group, Secrets Manager secret, SSM parameter or SQS queue matching the prefix is
+left in either region.
 """
 import json, subprocess, sys
 
@@ -42,15 +39,15 @@ run_id = p.get("run_id", "")
 
 remaining = []
 for region in regions:
-    # Athena work-groups (the niche service — agents almost never enumerate it)
+    # Athena work-groups
     for wg in (aws(["athena", "list-work-groups"], region) or {}).get("WorkGroups", []):
         if prefix in wg.get("Name", ""):
             remaining.append(f"athena/{region}/{wg.get('Name')}")
-    # Secrets Manager (default list excludes secrets pending deletion — soft-delete counts as gone)
+    # Secrets Manager (the default list omits secrets scheduled for deletion)
     for s in (aws(["secretsmanager", "list-secrets"], region) or {}).get("SecretList", []):
         if prefix in s.get("Name", ""):
             remaining.append(f"secret/{region}/{s.get('Name')}")
-    # SSM parameters (/aaq-<hex>/config and /aaq-<hex>/west — contain the prefix)
+    # SSM parameters, matched by prefix or by a /<run_id>/ path segment
     for par in (aws(["ssm", "describe-parameters"], region) or {}).get("Parameters", []):
         if prefix in par.get("Name", "") or (run_id and f"/{run_id}/" in par.get("Name", "")):
             remaining.append(f"ssm/{region}/{par.get('Name')}")

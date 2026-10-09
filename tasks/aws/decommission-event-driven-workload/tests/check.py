@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-"""ext_archit_decommission_events grader (bundle) — full-decommission completeness check.
+"""Check that the aeb-<region> stack is fully decommissioned.
 
-State-only. PASS iff NOTHING carrying the prefix remains, swept across BOTH regions and
-ALL in-scope services (EventBridge rules, SQS, SNS). FAIL if anything is left — most often
-the cross-region orphans (a single-region sweep misses them) or the niche EventBridge rule
-(agents routinely forget `aws events list-rules` when sweeping a stack). Setup always
-creates the obvious home-region resources, so a no-op leaves them and fails. Reads the
-prefix + the two regions from ./seed_state.json. Exit 0 = PASS, non-zero = FAIL.
+Passes when no EventBridge rule, SQS queue or SNS topic carrying the prefix remains
+in either region recorded in seed_state.json.
 """
 import json
 import subprocess
@@ -43,7 +39,7 @@ regions = [p.get("primary_region", "us-east-1"), p.get("secondary_region", "us-w
 
 remaining = []
 for region in regions:
-    # EventBridge rules (the niche service agents forget)
+    # EventBridge rules
     for r in (aws(["events", "list-rules", "--name-prefix", prefix], region) or {}).get("Rules", []):
         name = r.get("Name", "")
         if prefix in name:

@@ -1,19 +1,10 @@
-"""Grader: a fresh urgent order event, shaped exactly like the real
-producer's convention (MessageAttributes priority=urgent, lowercase),
-reaches the escalation queue as plain JSON - not wrapped in an SNS
-notification envelope. A second, independent probe (category=ComplianceAudit)
-must also still arrive, proving the pre-existing compliance flow that shares
-the same FilterPolicy survived the fix. The topic and queue must not have
-been deleted or recreated.
+"""Check that urgent order events reach the escalation queue as plain JSON.
 
-Grades only what prompt.txt states and accepts every valid fix shape (the
-FilterPolicy corrected in place, the subscription recreated with an
-equivalent policy, etc.) - both checks are purely functional round trips,
-agnostic to how the fix was made.
-
-SNS -> SQS delivery is normally near-instant but not documented as
-instantaneous; each probe retries with sleeps rather than treating one
-receive attempt as final."""
+Passes when the topic and queue still exist, a message published with
+priority=urgent arrives on the queue without the SNS notification envelope, and
+a message published with category=ComplianceAudit still arrives. Each probe
+polls with retries because SNS to SQS delivery is not instantaneous.
+"""
 import json
 import time
 import uuid
@@ -29,7 +20,6 @@ seed = ck.seed()
 TOPIC_ARN = seed["topic_arn"]
 QUEUE_URL = seed["queue_url"]
 
-# --- Topic and queue must still exist (not deleted/recreated).
 try:
     sns.get_topic_attributes(TopicArn=TOPIC_ARN)
 except botocore.exceptions.ClientError:
@@ -55,8 +45,7 @@ def publish(priority=None, category=None, marker=None):
 
 
 def poll_for_marker(marker, deadline_s=150):
-    """Drains the queue looking for `marker`, discarding anything else
-    (leftover/irrelevant messages) so it never falsely matches on noise."""
+    """Drain the queue until `marker` is found, deleting unrelated messages."""
     deadline = time.time() + deadline_s
     while time.time() < deadline:
         resp = sqs.receive_message(QueueUrl=QUEUE_URL, MaxNumberOfMessages=10,
@@ -79,10 +68,7 @@ def poll_for_marker(marker, deadline_s=150):
     return None
 
 
-# --- Probe 1: the real producer's convention (lowercase "urgent") must now
-#     reach the queue. This alone proves the queue policy allows delivery
-#     from the real topic, RawMessageDelivery is on, and the filter's
-#     priority clause matches real traffic - any valid fix shape passes.
+# A message using the producer's lowercase priority value must reach the queue.
 urgent_marker = "urgent-%s" % uuid.uuid4().hex
 publish(priority="urgent", marker=urgent_marker)
 item = poll_for_marker(urgent_marker)
@@ -90,8 +76,7 @@ ck.require(item is not None,
            "a fresh urgent order event was published but never reached the "
            "escalation queue; something is still blocking delivery")
 
-# --- Probe 2 (restraint): the pre-existing ComplianceAudit routing that
-#     shares the same FilterPolicy must still work untouched.
+# The ComplianceAudit clause in the same FilterPolicy must still route.
 compliance_marker = "compliance-%s" % uuid.uuid4().hex
 publish(category="ComplianceAudit", marker=compliance_marker)
 item = poll_for_marker(compliance_marker)

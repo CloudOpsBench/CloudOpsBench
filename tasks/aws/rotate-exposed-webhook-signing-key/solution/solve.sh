@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Writes a new signing key to every copy of the secret, detaches version stages that
+# still return the exposed key, re-registers the relay-webhook-* task definitions without
+# the version pin, and deregisters active revisions that still resolve the exposed key.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -38,7 +41,7 @@ def scrub_secret(sm, secret_id):
                                                RemoveFromVersionId=version)
 
 
-# 1. The home-region secret first. This alone makes get_secret_value read clean.
+# The home-region secret first.
 scrub_secret(sm_home, arn)
 
 try:

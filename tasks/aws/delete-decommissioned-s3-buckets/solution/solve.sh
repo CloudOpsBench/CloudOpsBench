@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes every vera2- general-purpose bucket and every vera2- S3 table bucket.
 set -uo pipefail
 REGION="us-east-1"
 for b in $(aws s3api list-buckets --query "Buckets[?starts_with(Name,'vera2-')].Name" --output text); do

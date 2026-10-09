@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Replaces the policy of every vera2-* SNS topic that allows principal "*" with an
+# account-only policy, and clears the sharing policy of every vera2-* Serverless
+# Application Repository application that allows principal "*".
 set -uo pipefail
 zone="us-east-1"
 me=$(aws sts get-caller-identity --query Account --output text)

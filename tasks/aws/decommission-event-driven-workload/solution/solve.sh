@@ -1,22 +1,11 @@
 #!/usr/bin/env bash
-# Faithful revision: fully decommission the `aeb-<region>` event-driven stack by DISCOVERY.
-# The prompt states every resource is prefixed `aeb-{region}` where {region} is the home
-# region (== AWS_REGION at setup == at solution, same lane). Resources exist in BOTH regions
-# (home + a cross-region orphan) across EventBridge rules, SQS queues, and SNS topics.
-# Enumerate ALL regions, filter by the prefix client-side, and delete with the exact same AWS
-# ops the golden used (events delete-rule / sqs delete-queue / sns delete-topic).
-#
-# Two SQS subtleties the grader (which lists queues right after us) is sensitive to:
-#   * CREATE is eventually consistent — a queue may not list immediately (handled: home-region
-#     retry). A naive per-region 240s backoff spins in every empty region (~60min, blows the
-#     8-min cap), so the wait is reserved for HOME regions only.
-#   * DELETE propagates for up to ~60s — list-queues can still return a just-deleted queue. So
-#     we don't exit until list-queues confirms the prefix is gone in every home region, or the
-#     original golden (which deletes early) would out-race us and we'd leave a phantom queue.
-# Never reads seed_state.json.
+# Deletes every EventBridge rule, SNS topic and SQS queue whose name contains
+# the aeb-<region> prefix, across all regions, without reading seed_state.json.
+# SQS listing is eventually consistent after both create and delete, so queue
+# deletion is retried until list-queues no longer returns the prefix.
 set -uo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
-PREFIX="aeb-${AWS_REGION}"   # prompt: `aeb-{region}`, region = home region = AWS_REGION
+PREFIX="aeb-${AWS_REGION}"
 
 echo "==> decommissioning prefix '$PREFIX' across all regions"
 PREFIX="$PREFIX" python3 - <<'PY'
@@ -38,16 +27,16 @@ def q_matches(reg):
 
 def q_delete(reg, url):
     try:
-        boto3.client("sqs", region_name=reg).delete_queue(QueueUrl=url)  # exact op: sqs delete-queue
+        boto3.client("sqs", region_name=reg).delete_queue(QueueUrl=url)
         return True
     except ClientError:
         return False
 
-# ── Pass 1: strongly-consistent services across ALL regions; note where the stack lives ──
+# Strongly consistent services, across all regions.
 home = []   # regions hosting an aeb- rule/topic (== where an aeb- queue exists too)
 for reg in regions:
     hit = False
-    # EventBridge rules (the niche service) — remove targets before deleting
+    # EventBridge rules: remove targets before deleting
     ev = boto3.client("events", region_name=reg)
     try:
         rules = ev.list_rules().get("Rules", [])
@@ -65,7 +54,7 @@ for reg in regions:
         except ClientError:
             pass
         try:
-            ev.delete_rule(Name=name, Force=True)   # exact op: events delete-rule
+            ev.delete_rule(Name=name, Force=True)
             print(f"  del events {reg} {name}"); deleted += 1
         except ClientError:
             pass
@@ -82,7 +71,7 @@ for reg in regions:
             continue
         hit = True
         try:
-            sns.delete_topic(TopicArn=arn)   # exact op: sns delete-topic
+            sns.delete_topic(TopicArn=arn)
             print(f"  del sns {reg} {arn.rsplit(':',1)[-1]}"); deleted += 1
         except ClientError:
             pass
@@ -91,9 +80,9 @@ for reg in regions:
         home.append(reg)
 home = list(dict.fromkeys(home))
 
-# ── Pass 2: reconcile SQS in HOME regions only. Interleave the regions so the per-queue
-#    CREATE- and DELETE-consistency windows (~60s each) overlap instead of summing. Exit a
-#    region only once list-queues reports the prefix GONE, so the grader can't see a phantom.
+# Reconcile SQS in home regions only, interleaving regions so the per-queue
+# create and delete consistency windows (~60s each) overlap instead of summing. Leave a
+# region only once list-queues no longer reports the prefix.
 pending = list(home)
 deadline = time.time() + 210
 while pending and time.time() < deadline:

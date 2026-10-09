@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the CodeDeploy deployment group and application, the alarm, the alias,
+# the function and the IAM roles named in task_context.json.
 set -euo pipefail
 CONTEXT="${AGENT_WORKSPACE:-.}/task_context.json"; [ -f "$CONTEXT" ] || CONTEXT=task_context.json
 get() { python3 - "$CONTEXT" "$1" <<'PY'

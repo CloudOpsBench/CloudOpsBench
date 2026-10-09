@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes all vera2- SQS and MediaConvert queues in the region.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 for url in $(aws sqs list-queues --queue-name-prefix vera2- --region "$REGION" --query 'QueueUrls' --output text 2>/dev/null | tr '\t' '\n' | grep -v '^None$' || true); do

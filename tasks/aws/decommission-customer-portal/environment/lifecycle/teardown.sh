@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes all vera2 Well-Architected workloads, SQS queues, SNS topics and log groups.
 set -uo pipefail
 
 python3 - <<'PY'

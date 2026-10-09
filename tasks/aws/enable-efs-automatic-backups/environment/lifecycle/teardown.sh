@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes the vera2-tagged EFS file systems in us-east-1 and us-west-2.
 set -uo pipefail
 for R in us-east-1 us-west-2; do
   for f in $(aws efs describe-file-systems --region "$R" --query "FileSystems[?Tags[?Key=='Project'&&Value=='vera2']].FileSystemId" --output text 2>/dev/null); do

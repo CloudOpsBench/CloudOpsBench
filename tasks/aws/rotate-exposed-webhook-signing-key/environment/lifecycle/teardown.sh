@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cleanup. Never fails; a lane nuke resets state anyway.
+# Best-effort removal of the secrets, task definitions and role created by setup.sh.
+# Never fails.
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
 

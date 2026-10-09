@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Delete the portal's queue, topic, log group and any Well-Architected workload
+# that references the portal's suffix, leaving the billing workload in place.
 set -euo pipefail
 
 python3 - <<'PY'

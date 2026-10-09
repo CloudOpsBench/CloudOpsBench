@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes the alarms recorded in seed_state.json, composite alarm first.
 set -uo pipefail
 python3 - <<'PY' 2>/dev/null || true
 import json,boto3

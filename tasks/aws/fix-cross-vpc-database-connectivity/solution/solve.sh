@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Adds the peering routes in both route tables and allows TCP 5432 from the
+# prod-vpc CIDR on the primary database security group.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
@@ -33,7 +35,7 @@ def custom_rt(vpc_id):
 PROD_RT = custom_rt(PROD_VPC)
 SHARED_RT = custom_rt(SHARED_VPC)
 
-# The active peering connection linking the two VPCs (must stay as-is, not be recreated).
+# The active peering connection linking the two VPCs.
 peerings = ec2.describe_vpc_peering_connections(Filters=[
     {"Name": "status-code", "Values": ["active"]}])["VpcPeeringConnections"]
 peer = None
@@ -45,8 +47,8 @@ for p in peerings:
 assert peer, "no active peering connection between prod-vpc and shared-vpc"
 PEERING = peer["VpcPeeringConnectionId"]
 
-# The primary database SG in shared-vpc. Names are deliberately scrambled, so identify it by its
-# real Role tag (Role=primary-database), not by name.
+# The primary database SG in shared-vpc, identified by its Role tag
+# (Role=primary-database) rather than by name.
 sgs = ec2.describe_security_groups(Filters=[
     {"Name": "vpc-id", "Values": [SHARED_VPC]},
     {"Name": "tag:Role", "Values": ["primary-database"]}])["SecurityGroups"]
@@ -64,12 +66,12 @@ def add_route(rt_id, dest_cidr):
         if e.response["Error"]["Code"] != "RouteAlreadyExists":
             raise
 
-# 1. prod -> shared route (lets prod instances initiate connections)
+# prod -> shared route
 add_route(PROD_RT, SHARED_CIDR)
-# 2. shared -> prod return route (routing isn't transitive - both directions needed)
+# shared -> prod return route (peering routes are needed in both directions)
 add_route(SHARED_RT, PROD_CIDR)
 
-# 3. allow the application tier to reach the primary database on 5432. Scoped to the prod VPC CIDR
+# Allow the application tier to reach the primary database on 5432. Scoped to the prod VPC CIDR
 # rather than a cross-VPC security-group reference: same effect, without depending on VPC-peering
 # security-group referencing being enabled on this connection.
 try:

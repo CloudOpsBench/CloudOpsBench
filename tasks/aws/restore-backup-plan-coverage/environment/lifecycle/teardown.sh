@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Removes the backup plan, vault, recovery points, fleet resources and role that
+# setup created, and restores the account's AWS Backup opt-in settings.
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
 

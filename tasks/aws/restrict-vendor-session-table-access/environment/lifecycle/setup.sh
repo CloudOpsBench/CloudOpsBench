@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds two DynamoDB tables, the shared role dataex-access-role, and three vendor
+# integrations (Glue job, CodeBuild project, ECS service in a second region) that each
+# assume the role with a stored session policy allowing reads on both tables.
+# Records the seeded state in seed_state.json for the checker.
 set -euo pipefail
 ASSET_DIR="$(cd "$(dirname "$0")/assets" && pwd)"
 export ASSET_DIR
@@ -47,7 +51,7 @@ NARROW = {"Version": "2012-10-17", "Statement": [
 
 
 def purge():
-    """Remove leftovers from an earlier run. The lane nukes state; a dev account does not."""
+    """Remove leftovers from an earlier run."""
     try:
         glue.delete_job(JobName=GLUE_JOB)
     except Exception:
@@ -149,7 +153,7 @@ def purge():
 
 purge()
 
-# ------------------------------------------------------------------ tables and data
+# tables and data
 for name, rows in (
     (CATALOG, [("sku-1102", {"name": {"S": "walnut desk 120cm"}, "stock": {"N": "44"}}),
                ("sku-2210", {"name": {"S": "oak shelf"}, "stock": {"N": "17"}}),
@@ -178,7 +182,7 @@ for name, rows in (
         seeded_items[name][pk] = ddb.get_item(TableName=name, Key={"pk": {"S": pk}},
                                               ConsistentRead=True)["Item"]
 
-# ------------------------------------------------------------------ roles
+# roles
 def make_role(name, trust, tags=None, description=""):
     kwargs = {"RoleName": name, "AssumeRolePolicyDocument": json.dumps(trust),
               "Description": description}
@@ -246,7 +250,7 @@ scope_arn = iam.create_policy(
 iam.create_policy_version(PolicyArn=scope_arn, PolicyDocument=json.dumps(NARROW),
                           SetAsDefault=True)
 
-# ------------------------------------------------------------------ integration 1: Glue
+# integration 1: Glue
 with open(os.path.join(os.environ["ASSET_DIR"], "export.py"), "rb") as fh:
     script_body = fh.read()
 s3.create_bucket(Bucket=BUCKET)
@@ -271,7 +275,7 @@ for attempt in range(12):
             raise
         time.sleep(5)
 
-# ------------------------------------------------------------------ integration 2: CodeBuild
+# integration 2: CodeBuild
 BUILDSPEC = """version: 0.2
 phases:
   build:
@@ -312,7 +316,7 @@ for attempt in range(12):
             raise
         time.sleep(5)
 
-# ------------------------------------------------------------------ integration 3: ECS mirror
+# integration 3: ECS mirror
 vpcs = ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])["Vpcs"]
 if not vpcs:
     ec2.create_default_vpc()

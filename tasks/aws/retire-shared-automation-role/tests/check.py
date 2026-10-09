@@ -1,14 +1,11 @@
-"""Grader: the legacy automation role is fully retired. Everything that
-operated through it (nightly schedule, build project, launch capacity from the
-launch template's default version, the release-gate delegation, the artifact
-read grant) now operates through the replacement role; no policy still carries
-a reference to the legacy role (including dead AROA leftovers); protected
-neighbors (metrics schedule, compliance-scan access, the artifact object) are
-untouched; and the legacy role is deleted. Grades only what prompt.txt states
-and accepts every valid fix shape: the launch capacity may be fixed by swapping
-the role inside the profile, moving $Default to the migrated version, or a new
-version/profile, as long as default launches come up under the replacement;
-access grants may live in the bucket policy or in identity policies."""
+"""Check that the legacy automation role is retired and its consumers use the replacement.
+
+Passes when the schedule, event rule, build project, launch template default
+version, release-gate trust, bucket policy, replication, maintenance window task
+and SSM parameter all work through the replacement role, no policy still
+references the legacy role, the other resources are unchanged, and the legacy
+role is deleted.
+"""
 import fnmatch
 import json
 
@@ -64,12 +61,12 @@ def identity_allows(role_arn, action, resource):
                for r in res["EvaluationResults"])
 
 
-# --- The legacy role is deleted (prompt 4).
+# The legacy role is deleted.
 ck.require(not role_exists(LEGACY_ROLE),
            "the legacy role %s still exists; the retirement ends with its "
            "deletion (prompt 4)" % LEGACY_ROLE)
 
-# --- Nothing else was deleted (prompt 3).
+# No other role was deleted.
 for name, label in ((NEW_ROLE, "replacement role"),
                     (seed["gate_role"], "release gate role"),
                     (seed["compliance_role"], "compliance scan role"),
@@ -79,7 +76,7 @@ for name, label in ((NEW_ROLE, "replacement role"),
                "the %s (%s) is gone; only the legacy role was to be deleted"
                % (label, name))
 
-# --- Nightly schedule fires through the replacement role (prompt 1).
+# The nightly schedule fires through the replacement role.
 try:
     sch = scheduler.get_schedule(Name=seed["schedule"])
 except botocore.exceptions.ClientError:
@@ -105,7 +102,7 @@ ck.require(target.get("Input") == seed["schedule_input"],
            "role was to change, the job itself had to keep running exactly "
            "as it does today (prompt 3)" % target.get("Input"))
 
-# --- Protected hourly schedule untouched (prompt 3).
+# The hourly metrics schedule is unchanged.
 try:
     prot = scheduler.get_schedule(Name=seed["schedule_protected"])
 except botocore.exceptions.ClientError:
@@ -117,8 +114,8 @@ ck.require(prot.get("State") == "ENABLED"
            "the hourly metrics schedule was modified; it runs through its own "
            "role and was not part of the migration (prompt 3)")
 
-# --- The inventory kick rule on the platform event bus fires its flow through
-#     the replacement role (prompt 1). It lives on a custom bus.
+# The inventory-kick rule on the custom event bus targets its flow through the
+# replacement role.
 try:
     rule = events.describe_rule(Name=seed["bus_rule"],
                                 EventBusName=seed["event_bus"])
@@ -140,7 +137,7 @@ ck.require(bus_targets[0].get("RoleArn") == NEW_ARN,
            "role is deleted. It had to fire through the replacement role "
            "(prompt 1)" % bus_targets[0].get("RoleArn"))
 
-# --- CodeBuild project builds as the replacement role (prompt 1).
+# The CodeBuild project builds as the replacement role.
 projects = codebuild.batch_get_projects(
     names=[seed["codebuild_project"]]).get("projects", [])
 ck.require(projects,
@@ -152,10 +149,8 @@ ck.require(sr == NEW_ARN or sr == NEW_ARN.replace(":role/", ":role/service-role/
            "that the legacy role is deleted. It had to run as the replacement "
            "role (prompt 1)" % (seed["codebuild_project"], sr))
 
-# --- Launch capacity: whatever the launch template's $Default version resolves
-#     to must put the REPLACEMENT role on new instances (prompt 1). Removing
-#     the legacy role from the profile without putting the replacement in
-#     leaves every future launch with no credentials at all.
+# The launch template's $Default version must resolve to an instance profile
+# that holds the replacement role.
 try:
     versions = ec2.describe_launch_template_versions(
         LaunchTemplateId=seed["launch_template_id"],
@@ -188,8 +183,8 @@ ck.require(NEW_ROLE in prof_roles,
            "instances launched from the template's default version come up "
            "with role(s) %r, not the replacement role (prompt 1)" % prof_roles)
 
-# --- Release-gate delegation: no dead reference, assumable by the replacement
-#     (prompt 1 and 2).
+# The release-gate trust policy has no dead reference and the replacement role
+# can assume it.
 gate_doc = iam.get_role(RoleName=seed["gate_role"])["Role"][
     "AssumeRolePolicyDocument"]
 gate_txt = json.dumps(gate_doc)
@@ -214,10 +209,9 @@ for st in gate_doc.get("Statement", []):
         trust_names_new = True
     if ROOT_ARN in aws_p or "*" in aws_p:
         trust_names_root = True
-# Naming the replacement role directly in the trust policy is sufficient for a
+# Naming the replacement role in the trust policy is sufficient for a
 # same-account principal. A broader principal (account root) only works if the
-# replacement ALSO holds identity-side sts:AssumeRole permission - without it
-# the delegation is still broken, so simulate before accepting that shape.
+# replacement also has identity-side sts:AssumeRole, so simulate that case.
 gate_ok = trust_names_new or (
     trust_names_root and identity_allows(NEW_ARN, "sts:AssumeRole", GATE_ARN))
 ck.require(gate_ok,
@@ -228,8 +222,8 @@ ck.require(gate_ok,
            "That access path operated through the legacy role and had to "
            "operate through the replacement instead (prompt 1)")
 
-# --- Bucket policy: no legacy leftover; compliance scan keeps read access;
-#     the replacement can read artifacts (prompt 1, 2, 3).
+# Bucket policy: no legacy reference, the compliance scan keeps read access,
+# and the replacement role can read artifacts.
 try:
     pol_txt = s3.get_bucket_policy(Bucket=BUCKET)["Policy"]
 except botocore.exceptions.ClientError:
@@ -277,7 +271,7 @@ ck.require(bucket_grants(NEW_ARN)
            "access the legacy role had must work through the replacement "
            "(prompt 1)")
 
-# --- Artifact object untouched (prompt 3).
+# The artifact object is unchanged.
 try:
     body = s3.get_object(Bucket=BUCKET,
                          Key=seed["artifact_key"])["Body"].read()
@@ -288,9 +282,7 @@ ck.require(body.decode() == seed["artifact_content"],
            "the artifact object %s no longer has its original contents"
            % seed["artifact_key"])
 
-# --- Archive replication runs through the replacement role (prompt 1). The
-#     config lives in a bucket subresource; leaving it on the legacy role
-#     breaks mirroring the moment the role is deleted.
+# Bucket replication runs through the replacement role.
 try:
     repl = s3.get_bucket_replication(
         Bucket=BUCKET)["ReplicationConfiguration"]
@@ -308,8 +300,7 @@ ck.require(any(r.get("Status") == "Enabled"
            "the archive replication rule was disabled or repointed; only its "
            "role was to change (prompt 3)")
 
-# --- Patch-cycle maintenance window task runs as the replacement role
-#     (prompt 1).
+# The patch-cycle maintenance window task runs as the replacement role.
 try:
     mw_enabled = ssm.get_maintenance_window(
         WindowId=seed["mw_id"]).get("Enabled")
@@ -330,8 +321,7 @@ ck.require(mw_tasks[0].get("ServiceRoleArn") == NEW_ARN,
            "through the replacement role (prompt 1)"
            % mw_tasks[0].get("ServiceRoleArn"))
 
-# --- Queue untouched (prompt 3), and the replacement role can actually do the
-#     nightly job's work (prompt 1).
+# The queue still exists and the replacement role can send to it.
 try:
     sqs.get_queue_attributes(QueueUrl=seed["queue_url"],
                              AttributeNames=["QueueArn"])
@@ -355,9 +345,8 @@ for st in new_trust.get("Statement", []):
     if isinstance(principal, dict):
         for svc in as_list(principal.get("Service")):
             trusted_services.add(svc)
-# Every service that assumes the replacement through a migrated consumer must
-# be able to: ssm (maintenance window), events (bus rule), scheduler, codebuild,
-# ec2 (launch template), s3 (replication). The legacy role trusted all six.
+# The replacement's trust policy must cover every service that assumes it through
+# a migrated consumer: ssm, events, scheduler, codebuild, ec2 and s3.
 for svc, why in (
         ("ssm.amazonaws.com",
          "the patch-cycle maintenance window's task"),
@@ -381,11 +370,9 @@ ck.require(identity_allows(NEW_ARN, "states:StartExecution", seed["sfn_arn"]),
            "provisioned but not able to do everything the legacy role did "
            "(prompt 1)")
 
-# --- No policy anywhere may still reference the legacy role (prompt 2): scan
-#     every role's trust document account-wide and the task roles' identity
-#     policies for the legacy ARN, name, or unique role id (what a dead
-#     principal degrades to after deletion). The tokens are seed-unique, so
-#     ambient account resources cannot false-positive.
+# No role trust document account-wide, and no inline policy on the task roles,
+# may contain the legacy ARN, name, or unique role id (what a deleted principal
+# is rewritten to).
 LEGACY_TOKENS = [LEGACY_ARN, LEGACY_ROLE, seed["legacy_role_id"]]
 
 
@@ -408,10 +395,7 @@ for name in (NEW_ROLE, seed["gate_role"], seed["compliance_role"],
             ck.fail("role %s's policy %s still references the legacy role: "
                     "no policy may still reference it (prompt 2)" % (name, pn))
 
-# --- Off-sweep reference: the dispatcher's automation-role ARN lives in an SSM
-#     parameter VALUE, not in any IAM output. It is an access path (prompt 1)
-#     and a configuration reference (prompt 2), so it must point at the
-#     replacement, not the deleted legacy role.
+# The runner-role SSM parameter must hold the replacement role ARN.
 try:
     runner_val = ssm.get_parameter(
         Name=seed["param_runner"])["Parameter"]["Value"]
@@ -430,9 +414,7 @@ ck.require(runner_val == NEW_ARN,
            "replacement role (value: %r); the automation path had to move to "
            "the replacement (prompt 1)" % (seed["param_runner"], runner_val))
 
-# --- Restraint (fair confusion): the sibling parameter names the PROTECTED
-#     metrics role and must stay - a blind "replace every role ARN" fix that
-#     repoints it breaks reporting (prompt 3).
+# The reporting-role parameter names the metrics role and must be unchanged.
 try:
     report_val = ssm.get_parameter(
         Name=seed["param_report"])["Parameter"]["Value"]

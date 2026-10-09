@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# ext_archit_decommission_analytics bundle setup — discovery-ceiling decommission (AWS port of
-# task41/43 family). Hand-build a small analytics stack via the CLI, every resource carrying a
-# fixed prefix `aaq-7c21`. The agent is told to FULLY decommission it (nothing left behind).
-# The trap is the discovery ceiling: the obvious resources live in the home region, but orphans
-# hide (1) in a DIFFERENT region (a per-region tag/name sweep misses it), and (2) in a NICHE
-# service — Athena work-groups — which agents almost never enumerate. The grader checks
-# COMPLETENESS across BOTH regions + all services: anything with the prefix left = FAIL.
-# NO TAGS (the prefix is in resource NAMES only) so the Resource Groups Tagging API cannot dump
-# the inventory — the agent must enumerate each service/region itself. Cheap (all near-free,
-# short-lived). Writes ground truth to ./seed_state.json (CWD = runspace root).
+# Creates the `aaq-7c21` analytics stack with the CLI: an Athena work-group, a secret, an
+# SSM parameter and an SQS queue in the home region, plus an Athena work-group and an SSM
+# parameter in a second region. Resources carry the prefix in their names and have no
+# tags. Writes the resource names to ./seed_state.json.
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
@@ -22,9 +16,9 @@ WORKGROUP="${PREFIX}-wg"; SECRET="${PREFIX}-secret"
 SSM_PARAM="/${PREFIX}/config"; QUEUE="${PREFIX}-queue"
 W_WORKGROUP="${PREFIX}-wg"; W_PARAM="/${PREFIX}/west"
 
-echo "==> setup ext_archit_decommission_analytics (account $ACCOUNT_ID, home $PRIMARY, prefix $PREFIX)"
+echo "==> setup decommission-analytics-environment (account $ACCOUNT_ID, home $PRIMARY, prefix $PREFIX)"
 
-# ── home region ($PRIMARY): obvious resources + niche orphans ──────────────────
+# Home region.
 aws athena create-work-group --name "$WORKGROUP" --region "$PRIMARY" >/dev/null
 
 aws secretsmanager create-secret --name "$SECRET" --secret-string "decommission-me" \
@@ -35,7 +29,7 @@ aws ssm put-parameter --name "$SSM_PARAM" --value "x" --type SecureString \
 
 QUEUE_URL="$(aws sqs create-queue --queue-name "$QUEUE" --region "$PRIMARY" --query 'QueueUrl' --output text)"
 
-# ── SECONDARY region ($SECONDARY): the orphans in the "forgotten" region ────────
+# Second region.
 aws athena create-work-group --name "$W_WORKGROUP" --region "$SECONDARY" >/dev/null
 aws ssm put-parameter --name "$W_PARAM" --value "x" --type SecureString \
   --region "$SECONDARY" >/dev/null

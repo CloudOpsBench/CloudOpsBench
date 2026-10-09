@@ -1,27 +1,12 @@
 #!/usr/bin/env bash
+# Seeds the webhook signing-key secret in two regions, an unrelated payouts secret, a
+# shared execution role, and ECS task definition families whose secret references pin
+# the exposed version by id. Records the seeded state in seed_state.json.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 python3 <<'SEEDPY'
-"""Seeds the relay webhook signing key.
-
-The obvious repair verifies itself and is wrong three ways:
-
-  * put_secret_value replaces the key and get_secret_value returns the new one, which
-    reads as done, while rotation moves the old version to AWSPREVIOUS, which still
-    returns it, and the exposed version carries a second custom stage besides it;
-  * both us-east-1 task definition families pin the exposed version by its opaque version
-    id in the valueFrom ARN, so each keeps resolving that exact version forever - a
-    version with no stages left is still readable by id;
-  * the same signing key also lives in a standalone secret with the identical name in
-    us-west-2, read by the verifier family deployed there, and nothing in us-east-1
-    references it. The one honest thread is the shared execution role, whose policy
-    grants GetSecretValue on arn:aws:secretsmanager:*:<acct>:secret:relay-webhook-signing-key-*
-    - a region wildcard.
-
-The pin is a bare uuid in the version-id field of the secret ARN. Every family pins: a
-healthy unpinned sibling would hand over a diff instead of requiring the recall.
-"""
+"""Seeds the relay webhook signing key, its regional copy, and the task definitions that read it."""
 import json
 import os
 import secrets as pysecrets

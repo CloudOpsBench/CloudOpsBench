@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
+# Creates an SNS topic and a Serverless Application Repository application, both named
+# vera2-* and both shared with principal "*". Records their identifiers in
+# seed_state.json.
 set -uo pipefail
 zone="us-east-1"
 stamp="$(date +%s)${RANDOM}"
 who=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "000000000000")
 
-# --- scrub leftovers from earlier runs so a rerun starts clean ---
+# Remove leftovers from earlier runs.
 for old in $(aws sns list-topics --region "$zone" --query 'Topics[].TopicArn' --output text 2>/dev/null | tr '\t' '\n' | grep ':vera2-' || true); do
   aws sns delete-topic --topic-arn "$old" --region "$zone" 2>/dev/null || true
 done
@@ -40,8 +43,8 @@ app=$(aws serverlessrepo create-application \
   --region "$zone" --query 'ApplicationId' --output text 2>/dev/null || true)
 
 if [ -n "${app:-}" ]; then
-  # version 1.0.0 registers on create, but flipping the app public needs that version fully registered, which
-  # can trail the create call by a moment, so keep retrying until the policy sticks.
+  # The policy can only be set once version 1.0.0 has finished registering, which can
+  # lag the create call, so retry.
   tries=0
   while [ "$tries" -lt 20 ]; do
     if aws serverlessrepo put-application-policy --application-id "$app" \

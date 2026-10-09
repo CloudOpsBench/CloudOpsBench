@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Replace the stream handler with one that reports per-record failures and writes
+# state and receipts transactionally, then enable partial batch responses, batch
+# bisection, bounded retries and an S3 on-failure destination on the mapping.
 set -euo pipefail
 export AWS_PAGER=""
 REGION="${AWS_REGION:-us-east-1}"

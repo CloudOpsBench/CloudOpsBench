@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Disables alarm actions on every vera2-* metric and composite alarm in all regions.
 set -euo pipefail
 python3 - <<'PY'
 import boto3
@@ -14,7 +15,7 @@ for reg in regions:
                 if a.get("AlarmName","").startswith("vera2-"): names.append(a["AlarmName"])
     except Exception: continue
     if not names: continue
-    c.disable_alarm_actions(AlarmNames=names)  # exact op from original (metric + composite together)
+    c.disable_alarm_actions(AlarmNames=names)
     print("disabled actions on",names,reg); n+=len(names)
 assert n>0,"no vera2 CloudWatch alarms found across regions"
 PY

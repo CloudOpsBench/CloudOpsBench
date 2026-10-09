@@ -1,6 +1,10 @@
-"""Grader. Resolves the signing key exactly the way ECS would, from every route the prompt
-puts in scope: the secret's current value, every version stage it still carries, and every
-active revision of every seeded workload in both regions. Nothing here waits on anything."""
+"""Check that the exposed signing key is no longer served and every workload uses the new one.
+
+Passes when the secret holds a new key under signing_key, no version stage on it returns
+the exposed value, every active revision of every seeded relay-webhook-* task definition
+family in both regions resolves that same new key from a Secrets Manager secret, and the
+payouts secret keeps its seeded value and version stages.
+"""
 import json
 
 import checkkit as ck
@@ -32,7 +36,7 @@ def secret_string(secret_id, region, **kw):
 
 
 def json_key(text, key):
-    """What ECS hands the container: the named JSON key, or the whole string."""
+    """Return what ECS hands the container: the named JSON key, or the whole string."""
     if not key:
         return text
     try:
@@ -41,7 +45,7 @@ def json_key(text, key):
         return None
 
 
-# 1. the current value of the us-east-1 secret defines the new key
+# The current value of the us-east-1 secret defines the new key.
 current = secret_string(EAST_ARN, EAST)
 ck.require(current is not None,
            "the secret %s in %s no longer returns a value. instruction.md requires that it "
@@ -57,7 +61,7 @@ ck.require(EXPOSED not in current,
            "the one the secret held when the task started, readable then with a plain "
            "get_secret_value." % NAME)
 
-# 2. every stage the us-east-1 secret still carries
+# Every version stage the us-east-1 secret still carries.
 stages = sorted({st for sts in sm[EAST].describe_secret(SecretId=EAST_ARN)
                  ["VersionIdsToStages"].values() for st in sts})
 for stage in stages:
@@ -73,7 +77,7 @@ for stage in stages:
 
 
 def parse_ref(ref, home_region):
-    """(secret_id, region, json key, stage, version) for an ECS valueFrom."""
+    """Split an ECS valueFrom into (secret_id, region, json key, stage, version)."""
     if ref.startswith("arn:"):
         parts = ref.split(":")
         secret_id = ":".join(parts[:7])
@@ -89,7 +93,7 @@ def parse_ref(ref, home_region):
 
 
 def audit(what, region, listed_by, ref):
-    """Every workload is graded the same way, in whichever region it lives."""
+    """Fail unless this valueFrom resolves to the new key and not the exposed one."""
     secret_id, sregion, key, stage, version = parse_ref(ref, region)
     if sregion not in sm:
         ck.fail("%s reads WEBHOOK_SIGNING_KEY from valueFrom %s, which points at region "
@@ -177,7 +181,7 @@ for region, families in ((EAST, seed["east_families"]), (WEST, seed["west_famili
                   region, "ecs:DescribeTaskDefinition on the family in %s" % region,
                   entry["valueFrom"])
 
-# 4. the payouts team's secret, value and stages alike
+# The payouts team's secret: value and version stages.
 other_now = secret_string(seed["other_arn"], EAST)
 ck.require(other_now is not None and seed["other_value"] in other_now,
            "the secret %s no longer returns the value it was seeded with. instruction.md "

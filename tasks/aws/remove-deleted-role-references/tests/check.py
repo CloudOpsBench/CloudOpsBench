@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
-"""Grade that nothing in the account still names the retired role, and that it stayed deleted.
+"""Check that nothing in the account still names the retired role.
 
-The surviving reference is the account's Greengrass service-role association. GetServiceRoleForAccount
-takes no identifier, so there is nothing to enumerate and no sweep reaches it; the service is an
-edge-device runtime whose purpose has nothing to do with identity, so it is not on the list a model walks
-when it asks what still holds a role.
-
-Matches the prompt clause for clause: the reference must stop naming the retired role, which
-disassociating or associating a role already in the account both achieve. Re-creating the retired name
-fails, minting a new role to point at fails, and pointing at a role that does not exist fails. The role
-seeded to be left alone must survive.
+Passes when the Greengrass service-role association is unset or names a role that
+existed before setup finished, no IAM policy document names the retired role, the
+retired role has not been re-created, and the keep role is unchanged.
 """
 import json
 import time
@@ -58,7 +52,7 @@ def _mentions(doc):
 
 
 def _predates_handover(role_name):
-    """A role the solver minted cannot be a repair, so the replacement must be older than the seeding."""
+    """True if the role exists and was created before setup finished."""
     try:
         cd = iam.get_role(RoleName=role_name)["Role"].get("CreateDate")
     except ClientError as e:
@@ -71,7 +65,7 @@ def _predates_handover(role_name):
 
 
 def _keep_unchanged():
-    """Left alone means unchanged, not merely still present."""
+    """Fail if the keep role is missing or any of its recorded attributes changed."""
     try:
         now = iam.get_role(RoleName=KEEP)["Role"]
     except ClientError as e:
@@ -123,9 +117,7 @@ def _keep_unchanged():
 
 
 def _audit_account():
-    """One paginated sweep covers every IAM identity that can carry a policy document -- roles, users,
-    groups and customer-managed policies -- so the account-wide claim is verified where an identity other
-    than a role is what still names the retired role."""
+    """Fail if any role, user, group or customer-managed policy document names the retired role."""
     try:
         for page in iam.get_paginator("get_account_authorization_details").paginate(
                 Filter=["Role", "User", "Group", "LocalManagedPolicy"]):

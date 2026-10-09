@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Delete every vera2- bucket: general-purpose buckets from list-buckets and
+# S3 Express directory buckets from list-directory-buckets.
 set -uo pipefail
 REGION="us-east-1"
 DELETED=""

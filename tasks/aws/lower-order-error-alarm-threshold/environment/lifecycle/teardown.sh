@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the vera2-cw-pin-* schedules and roles and the
+# vera2-high-order-errors-* alarms.
 set -euo pipefail
 
 python3 - <<'PY'

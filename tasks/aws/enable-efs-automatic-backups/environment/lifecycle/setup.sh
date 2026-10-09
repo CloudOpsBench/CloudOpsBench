@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Creates three vera2 EFS file systems, two in the default region and one in
+# us-west-2, with automatic backups disabled, and records them in seed_state.json.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"; ALT="us-west-2"; SUF="${RANDOM}${RANDOM}"
 mk(){ local tok="$1" reg="$2"

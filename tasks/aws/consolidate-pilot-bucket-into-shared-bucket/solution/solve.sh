@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Completes the in-progress multipart upload in the pilot bucket, copies every
+# pilot object to the shared bucket, verifies each copy by SHA-256, and then
+# deletes the source objects.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

@@ -1,4 +1,9 @@
-"""Grade a lossless pilot-to-shared dataset consolidation."""
+"""Check that the pilot dataset was consolidated into the shared bucket without loss.
+
+Passes when both buckets exist, the pilot bucket has no objects or multipart uploads, and
+the shared bucket holds exactly the seeded pilot payloads and its original object with
+matching size and SHA-256, and no unfinished multipart uploads.
+"""
 import hashlib
 
 import boto3

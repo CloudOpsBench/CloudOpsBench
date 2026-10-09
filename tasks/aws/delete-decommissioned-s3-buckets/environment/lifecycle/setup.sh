@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Creates one general-purpose S3 bucket and one S3 table bucket with the vera2-
+# prefix and records them in seed_state.json for the checker.
 set -euo pipefail
 REGION="us-east-1"
 SUF="${RANDOM}${RANDOM}"

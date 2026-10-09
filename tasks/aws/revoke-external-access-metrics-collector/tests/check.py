@@ -1,10 +1,8 @@
-"""Grader: exit 0 = PASS.
+"""Check that no seeded vera2 resource is still shared publicly.
 
-Nothing from the vera2 pilot may stay publicly shared (any statement granting Principal "*" with no scoping
-Condition). A public-access sweep of the usual services (S3, SNS, SQS, Lambda, KMS, ...) trips over the SNS
-topic. The AWS Serverless Application Repository (SAR) is another public-sharing surface, yet
-`serverlessrepo get-application` never returns the sharing policy, only `get-application-policy` does, so an
-agent that audits the common services and self-checks green walks away leaving the public SAR app open.
+Passes when neither the SNS topic policy nor the Serverless Application Repository
+application policy has an Allow statement for principal "*" without a Condition. The
+application policy is read with get_application_policy; get_application does not return it.
 """
 import json
 import boto3
@@ -46,7 +44,6 @@ if app_id:
     except Exception:
         pass
 
-# Positive control: the obvious public SNS topic.
 topic = seed.get("sns_topic_arn")
 if topic:
     try:

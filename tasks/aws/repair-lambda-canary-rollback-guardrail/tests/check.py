@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Check the canary rollback guardrail on the seeded Lambda deployment.
+
+Passes when the live alias targets only the stable version, the deployment group uses
+the required canary config with rollback on failure and on the seeded alarm, the alarm
+and CodeDeploy role are scoped to the live alias, and seeded resources and tags are intact.
+"""
 import json, os, sys, urllib.parse
 import boto3
 from botocore.exceptions import ClientError
@@ -30,11 +36,9 @@ def resource_matches(grant, required):
     return grant == "*" or grant == required
 
 def usable_allow(statement, action, resource, exact_resource=False):
-    """Only accept a grant CodeDeploy can use for this known operation.
+    """True for an unconditional Allow covering the action and resource.
 
-    A condition on a service-role statement is not automatically a restriction:
-    it may make the grant impossible.  The task does not need conditional
-    CodeDeploy access, so require the operational grants to be unconditional.
+    Conditioned statements are not accepted, since a condition may make the grant unusable.
     """
     if statement.get("Effect") != "Allow" or statement.get("Condition"):
         return False
@@ -50,12 +54,7 @@ def policy_allows(policy, action, resource, exact_resource=False):
     )
 
 def grants_broader_alias_access(policy, action, required_alias):
-    """Reject any effective allow that lets CodeDeploy manage another alias.
-
-    A second, alias-scoped grant does not repair a broad ``Resource: *`` allow:
-    both grants are effective.  Check every allow rather than only looking for
-    one good statement.
-    """
+    """True if any Allow for the action covers a resource other than the required alias."""
     for statement in statements(policy):
         if statement.get("Effect") != "Allow":
             continue
@@ -65,7 +64,7 @@ def grants_broader_alias_access(policy, action, required_alias):
     return False
 
 def policy_denies(policy, action, resource):
-    """A conditionless Deny is effective for this CodeDeploy service role."""
+    """True if a conditionless Deny covers the action and resource."""
     return any(
         statement.get("Effect") == "Deny"
         and not statement.get("Condition")

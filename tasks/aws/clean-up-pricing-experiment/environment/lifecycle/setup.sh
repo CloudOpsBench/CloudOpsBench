@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds a versioned analytics bucket holding the pricing experiment's Athena
+# result sets and an unfinished multipart upload next to Finance's results, plus
+# an access point, Athena workgroup, secret and IAM role for each owner.
+# Verifies the fixture and writes seed_state.json.
 set -euo pipefail
 
 _ts() { date -u +'%Y-%m-%dT%H:%M:%SZ'; }
@@ -26,8 +30,7 @@ export KEEPER_SECRET="vera/finance/warehouse-dsn"
 export TARGET_ROLE="vera-price-test-query-role"
 export KEEPER_ROLE="vera-finance-reporting-role"
 
-# Two Athena query execution ids. Athena names each result set after the query
-# that produced it, so these are what the objects are actually called.
+# Athena query execution ids; Athena names each result object after its query.
 export QID_A="3f7a1c92-5b64-4d31-9a0e-7c2b8e11d456"
 export QID_B="8c41d0b7-2e59-4f88-b3aa-16d97f0c5e23"
 export QID_K="c5e30a48-9f71-42bd-8e66-b0d4a7213f90"
@@ -171,7 +174,7 @@ put_secret() {
   local deleted
   if deleted=$(aws secretsmanager describe-secret --secret-id "${name}" \
                  --query 'DeletedDate' --output text 2>/dev/null); then
-    # A secret inside its recovery window CANNOT be recreated - restore first.
+    # A secret inside its recovery window cannot be recreated; restore it first.
     if [ "${deleted}" != "None" ]; then
       aws secretsmanager restore-secret --secret-id "${name}" >/dev/null
     fi
@@ -186,9 +189,6 @@ log "secrets ${TARGET_SECRET} and ${KEEPER_SECRET} ..."
 put_secret "${TARGET_SECRET}" '{"api_key":"pk_live_4Xn2Qd8vRt6LmZa0"}' "price-test"
 put_secret "${KEEPER_SECRET}" '{"dsn":"warehouse.internal:5439/finance"}' "finance-reporting"
 
-# =============================================================================
-# 7. IAM roles, one per owner.
-# =============================================================================
 TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"athena.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 put_role() {
   local name="$1" tagk="$2"
@@ -232,7 +232,6 @@ aws s3api get-object --bucket "${RESULTS_BUCKET}" --key "${TARGET_PREFIX}${QID_A
 grep -q "dana.whitfield@example.com" "${WORK}/readback.csv" \
   || die "the result sets do not contain the customer rows — centrepiece is broken"
 
-# ... and the workgroup must really point at them.
 OUT=$(aws athena get-work-group --work-group "${TARGET_WG}" \
   --query 'WorkGroup.Configuration.ResultConfiguration.OutputLocation' --output text)
 [ "${OUT}" = "s3://${RESULTS_BUCKET}/${TARGET_PREFIX}" ] \
@@ -254,9 +253,6 @@ log "  confirmed: the experiment's query results hold the customer rows, they li
 log "             bucket Finance depends on, and the workgroup that put them there is the"
 log "             only thing naming the location"
 
-# =============================================================================
-# 9. Seed state.
-# =============================================================================
 log "writing ${SEED_STATE} ..."
 python3 -c '
 import json, os, sys

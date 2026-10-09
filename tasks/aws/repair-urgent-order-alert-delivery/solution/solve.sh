@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Reference fix. Discovers every resource at runtime (names, tags, listing);
-# never reads seed_state.json.
+# Repoints the queue policy at the current topic, enables RawMessageDelivery and
+# corrects the priority filter value. Resources are discovered by name at runtime.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -14,9 +14,7 @@ QUEUE_ARN=$(aws sqs get-queue-attributes --queue-url "$QUEUE_URL" \
 SUB_ARN=$(aws sns list-subscriptions-by-topic --topic-arn "$TOPIC_ARN" \
   --query "Subscriptions[?Protocol=='sqs'].SubscriptionArn | [0]" --output text)
 
-# 1. Queue policy: point the SourceArn condition at the real, current topic
-#    instead of the retired one. Single-statement policy, no other
-#    statement to preserve here.
+# Point the queue policy's SourceArn condition at the current topic.
 python3 - "$QUEUE_ARN" "$TOPIC_ARN" > queue-policy.json <<'PY'
 import json
 import sys
@@ -38,16 +36,12 @@ PY
 aws sqs set-queue-attributes --queue-url "$QUEUE_URL" --attributes file://queue-policy.json
 rm -f queue-policy.json
 
-# 2. RawMessageDelivery: turn it on so the on-call tooling gets plain JSON,
-#    not an SNS notification envelope.
+# Deliver the plain message body instead of the SNS notification envelope.
 aws sns set-subscription-attributes --subscription-arn "$SUB_ARN" \
   --attribute-name RawMessageDelivery --attribute-value true
 
-# 3. FilterPolicy: read the CURRENT policy and patch only the priority
-#    clause's value to the real, lowercase producer convention - the
-#    ComplianceAudit clause already matches correctly and is carried
-#    forward untouched, since SetSubscriptionAttributes replaces the whole
-#    FilterPolicy, not just one clause.
+# SetSubscriptionAttributes replaces the whole FilterPolicy, so read the current
+# policy and change only the priority clause.
 CURRENT_FP=$(aws sns get-subscription-attributes --subscription-arn "$SUB_ARN" \
   --query "Attributes.FilterPolicy" --output text)
 python3 - "$CURRENT_FP" > filter-fix.json <<'PY'

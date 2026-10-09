@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Tags every fleet resource for the plan's selection, removes the Deny statements
+# from the backup role and from the file system policy, and opts the region in to
+# the resource types the plan needs.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -16,7 +19,7 @@ efs = boto3.client("efs", region_name=REGION)
 ec2 = boto3.client("ec2", region_name=REGION)
 iam = boto3.client("iam")
 
-# --- find the plan, its selections and the fleet -------------------------------
+# find the plan, its selections and the fleet
 plans = sorted((p for p in backup.list_backup_plans()["BackupPlansList"]
                 if p["BackupPlanName"].startswith("vera-nightly-")),
                key=lambda p: p["CreationDate"], reverse=True)
@@ -29,7 +32,7 @@ print(f"repairing plan {plans[0]['BackupPlanName']} (id {RUN_ID}, "
 
 
 def in_fleet(name):
-    """The prompt's own scope: named vera-*, carrying this run's id."""
+    """Fleet resources: named vera-*, carrying this run's id."""
     return name.startswith("vera-") and name.endswith(RUN_ID)
 
 selections = []
@@ -44,7 +47,7 @@ for sel in selections:
 if not wanted:
     raise SystemExit("solution: the plan's selections match on no tag")
 
-# --- REQUIRED REPAIR 1 of 4: every fleet member carries the selection tag ---
+# every fleet member carries the selection tag
 for name in ddb.list_tables()["TableNames"]:
     if not in_fleet(name):
         continue
@@ -92,7 +95,7 @@ for fs in efs.describe_file_systems()["FileSystems"]:
   except botocore.exceptions.ClientError as e:
     print(f"skipped file system {fs.get('FileSystemId')}: {e.response['Error']['Code']}")
 
-# --- REQUIRED REPAIR 2 of 4: the role's inline Deny on file systems --------
+# the role's inline Deny on file systems
 for sel in selections:
     role = sel["IamRoleArn"].rsplit("/", 1)[-1]
     for pol in iam.list_role_policies(RoleName=role)["PolicyNames"]:
@@ -103,7 +106,7 @@ for sel in selections:
             iam.delete_role_policy(RoleName=role, PolicyName=pol)
             print(f"removed inline policy {pol} from {role}")
 
-# --- REQUIRED REPAIR 3 of 4: the account+region resource-type opt-in -------
+# the account and region resource-type opt-in
 settings = backup.describe_region_settings()["ResourceTypeOptInPreference"]
 need = {}
 if settings.get("EFS") is False:

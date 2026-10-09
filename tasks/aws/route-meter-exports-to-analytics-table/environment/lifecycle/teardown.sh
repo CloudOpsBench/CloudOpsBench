@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Courtesy cleanup. Never fail the run.
+# Best-effort cleanup of the resources recorded in seed_state.json; never fails.
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -37,7 +37,7 @@ def quiet(fn, *a, **k):
 quiet(lam.delete_function, FunctionName=seed["function"])
 for name in (seed["lure_stream"], seed["real_stream"]):
     quiet(fh.delete_delivery_stream, DeliveryStreamName=name, AllowForceDelete=True)
-# any stream the agent created at the curated location
+# any stream created at the curated location
 resp = quiet(fh.list_delivery_streams, Limit=100) or {}
 for name in resp.get("DeliveryStreamNames", []):
     if name.startswith("meter-") or name.startswith("grid-"):

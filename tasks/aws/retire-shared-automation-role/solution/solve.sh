@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Reference fix. Discovers every resource at runtime (prefixes, listing,
-# reference scans); never reads seed_state.json.
+# Copies the legacy role's trust and inline policies to the replacement role,
+# repoints every consumer of the legacy role at the replacement, then deletes the
+# legacy role. Resources are discovered at runtime.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -44,8 +45,7 @@ for PN in $(aws iam list-role-policies --role-name "$LEGACY" \
     --policy-document "$DOC"
 done
 
-# 1. Scheduler schedules firing with the legacy role: repoint the target role.
-#    update-schedule replaces the whole schedule, so re-specify everything.
+# update-schedule replaces the whole schedule, so re-specify every field.
 for S in $(aws scheduler list-schedules --query "Schedules[].Name" --output text); do
   INFO=$(aws scheduler get-schedule --name "$S" --output json)
   case "$INFO" in *"$LEGACY_ARN"*) ;; *) continue ;; esac
@@ -77,7 +77,6 @@ print(t.replace('$LEGACY_ARN', '$NEW_ARN'))")
   done
 done
 
-# 2. CodeBuild projects running as the legacy role.
 for P in $(aws codebuild list-projects --query "projects" --output text); do
   SR=$(aws codebuild batch-get-projects --names "$P" \
     --query "projects[0].serviceRole" --output text)
@@ -106,8 +105,7 @@ for r in json.load(sys.stdin)['Roles']:
   aws iam update-assume-role-policy --role-name "$R" --policy-document "$NEWDOC"
 done
 
-# 5. Bucket policies granting the legacy role: swap the principal, keeping the
-#    rest of the shared statement (other principals keep their access).
+# Swap the principal in place so other principals in the statement keep access.
 for B in $(aws s3api list-buckets \
              --query "Buckets[?starts_with(Name, 'fleet-artifacts-')].Name" \
              --output text); do
@@ -132,7 +130,6 @@ print(c.replace('$LEGACY_ARN', '$NEW_ARN'))")
     --replication-configuration "$NEWREPL"
 done
 
-# 5c. Maintenance window tasks running with the legacy role as service role.
 for W in $(aws ssm describe-maintenance-windows \
              --query "WindowIdentities[].WindowId" --output text); do
   for T in $(aws ssm describe-maintenance-window-tasks --window-id "$W" \
@@ -155,8 +152,8 @@ for P in $(aws ssm describe-parameters \
   fi
 done
 
-# 6. Only now, with nothing referencing it, delete the legacy role (inline
-#    policies and any managed attachments must go first).
+# Inline policies and managed attachments must be removed before the role can
+# be deleted.
 for PN in $(aws iam list-role-policies --role-name "$LEGACY" \
               --query "PolicyNames" --output text); do
   aws iam delete-role-policy --role-name "$LEGACY" --policy-name "$PN"

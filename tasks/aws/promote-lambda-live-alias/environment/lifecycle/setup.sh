@@ -12,7 +12,7 @@ SFX="$AWS_REGION"
 WS="${AGENT_WORKSPACE:?platform must set AGENT_WORKSPACE}"
 FUNC="vera-order-processor-${SFX}"; QNAME="vera-order-events-${SFX}"
 
-echo "==> aws_task12 setup: Lambda + live alias + hidden version-pinned ESM"
+echo "==> setup: Lambda + live alias + hidden version-pinned ESM"
 rm -rf "$WS"; mkdir -p "$WS"
 
 cat > "${WS}/provider.tf" <<EOF
@@ -139,12 +139,12 @@ EOF
 echo "  Swapped workspace index.py to the new build (pending rollout)"
 
 echo ""
-echo "==> aws_task12 setup complete"
+echo "==> setup complete"
 echo "    Agent task: publish the new code and cut the live alias to it — without"
 echo "    leaving anything that consumes this function stranded on the old version."
 
-# Private runtime metadata for the portal; do not copy into the agent workspace.
-python3 - <<'PORTAL_STATE'
+# Private seed state for the checker; do not copy into the agent workspace.
+python3 - <<'SEED_STATE'
 import json, os
 json.dump({"region": os.environ["AWS_REGION"]}, open("seed_state.json", "w"), indent=2)
-PORTAL_STATE
+SEED_STATE

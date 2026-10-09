@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Registers an AMI tagged Project=vera2 from a small snapshot and creates a
+# Recycle Bin retention rule covering images with that tag. A throwaway image is
+# deregistered first to confirm the rule is enforcing, then the bin is emptied.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="$(date +%s | tail -c 5)${RANDOM}"
@@ -71,7 +74,7 @@ aws ec2 restore-image-from-recycle-bin --region "$REGION" --image-id "$CANARY" >
 aws ec2 delete-tags --region "$REGION" --resources "$CANARY" --tags Key=Project >/dev/null 2>&1 || true
 sleep 3
 aws ec2 deregister-image --region "$REGION" --image-id "$CANARY" >/dev/null 2>&1 || true
-# defensively purge anything the bin may still hold, then require it empty (the solver must learn nothing here)
+# Purge anything the bin still holds, then require it to be empty.
 LEFT=0
 for _ in $(seq 1 8); do
   LEFT=$(aws ec2 list-images-in-recycle-bin --region "$REGION" --query 'length(Images)' --output text 2>/dev/null || echo 0)
@@ -85,8 +88,8 @@ for _ in $(seq 1 8); do
   done
   sleep 4
 done
-# The loop above samples the bin BEFORE each cleanup pass, so $LEFT still holds the count from the
-# start of the final pass. Re-read it here or a bin the last pass just emptied fails setup.
+# The loop samples the bin before each cleanup pass, so $LEFT is stale after the
+# final pass. Re-read it here.
 LEFT=$(aws ec2 list-images-in-recycle-bin --region "$REGION" --query 'length(Images)' --output text 2>/dev/null || echo 0)
 [ "$LEFT" = "0" ] || { echo "FATAL: canary left $LEFT image(s) in the bin — that would teach the solver the answer"; exit 1; }
 

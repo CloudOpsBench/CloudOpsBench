@@ -1,43 +1,9 @@
-"""Grader for backup-optin-gap-task.
+"""Check that the nightly backup plan protects the fleet and leaves the scratch bucket out.
 
-Grades only what prompt.txt states, and accepts every fix shape that gets
-there. Nothing here reads or requires any particular opt-in setting, role
-policy or tag - it runs what the nightly plan itself would run and grades the
-outcome, so any route that produces the required end state passes.
-
-Order is outcome first:
-
-  1. requirement 1, functional - for every fleet resource the plan's selections
-     currently match, start a backup job into the plan's vault with that
-     selection's own role and require it to complete. This is the nightly run,
-     executed rather than inferred.
-  2. requirement 1, coverage - every fleet resource except the scratch bucket
-     is matched by a selection on the plan.
-  3. requirement 2 - the scratch bucket is either outside every selection on
-     the plan, or a job for it is refused. Both are "not backed up by that
-     plan"; either passes.
-  4. requirement 3 - the plan, the vault and the fleet resources are the
-     seeded ones.
-
-Why real jobs, and not a permission check: neither an IAM policy simulation nor
-a reading of the role can establish that a backup will actually run. Two things
-AWS evaluates separately decide it, and both are seeded broken here:
-
-  * the account-and-region resource-type opt-in
-    (backup:DescribeRegionSettings). A type that is not opted in has its job
-    refused at the API - "Resource type is not opted in" - with no job record
-    created at all.
-  * the target's own resource policy. vera-exports-* carries a file system
-    policy that allows everything except elasticfilesystem:Backup, which it
-    explicitly denies. AWS fails that job with "not authorized to perform:
-    elasticfilesystem:Backup ... with an explicit deny in a resource-based
-    policy" while every mount the policy allows keeps working.
-
-A rollout that repairs the tag, the role's inline Deny and the opt-in, and then
-concludes from an allowed IAM simulation that the backups will complete, has
-left the second one in place. That is the intended miss, it is reproducible by
-hand against live AWS, and a job started by this grader is the only thing that
-can tell the two apart.
+Passes when every fleet resource except the scratch bucket is matched by a selection
+on the plan and a backup job started for it with that selection's role completes; the
+scratch bucket is unmatched or its job is refused, and the vault holds no recovery
+point for it; and the plan, vault and fleet resources are the seeded ones.
 """
 import fnmatch
 import time
@@ -59,10 +25,8 @@ ddb = boto3.client("dynamodb", region_name=REGION)
 efs = boto3.client("efs", region_name=REGION)
 s3 = boto3.client("s3", region_name=REGION)
 
-# EFS completes in ~25s and an empty table in ~2m45s, and the two table jobs run
-# in parallel - but ~2m45s is one day's measurement, not a guarantee, and a
-# correct fix must never fail on a slow AWS day. 420s is ~2.5x the observed worst
-# case and still a fraction of the platform's ~600s grader ceiling.
+# Upper bound for the backup jobs to finish. Observed worst case is about 2m45s
+# for an empty table.
 JOB_DEADLINE = 420
 
 
@@ -78,7 +42,7 @@ def err(e):
     return f"{e.response['Error']['Code']}: {e.response['Error']['Message']}"
 
 
-# --- what the plan selects right now ------------------------------------------
+# Read the plan, the vault and the plan's current selections.
 try:
     plan = backup.get_backup_plan(BackupPlanId=PLAN_ID)["BackupPlan"]
 except botocore.exceptions.ClientError as e:
@@ -190,14 +154,14 @@ def matching_selections(arn):
 matches = {arn: matching_selections(arn) for arn in PROTECTED + [EXCLUDED]}
 
 
-# --- requirement 1, functional: run what the nightly plan would run -----------
+# Requirement 1: start the job the plan would run for each matched resource.
 def start(arn, role_arn):
     return backup.start_backup_job(BackupVaultName=VAULT, ResourceArn=arn,
                                    IamRoleArn=role_arn)["BackupJobId"]
 
 
-# A resource matched by more than one selection is backed up if ANY of them can
-# do it, so every matching selection's role gets a turn before this is a refusal.
+# A resource matched by several selections is backed up if any of them can do it,
+# so each matching selection's role is tried before a refusal is recorded.
 started, refused = {}, {}
 for arn in PROTECTED:
     hits, _ = matches[arn]
@@ -212,7 +176,7 @@ for arn in PROTECTED:
 
 
 def abandon():
-    """Nothing left to learn from a job once the run is already decided."""
+    """Stop the started jobs once the outcome is already decided."""
     for job_id, _sid, _role, _at in started.values():
         try:
             backup.stop_backup_job(BackupJobId=job_id)
@@ -259,7 +223,7 @@ for arn in PROTECTED:
                f"this resource. Requirement 1 is that this job completes. Resource ARN: "
                f"{arn}")
 
-# --- requirement 1, coverage --------------------------------------------------
+# Requirement 1: every fleet resource is matched by a selection.
 for arn in PROTECTED:
     hits, tags = matches[arn]
     ck.require(hits,
@@ -270,7 +234,7 @@ for arn in PROTECTED:
                f"Requirement 1 is that every fleet resource except the scratch bucket is "
                f"covered by a selection on this plan. Resource ARN: {arn}")
 
-# --- requirement 2: the scratch bucket is still not backed up -----------------
+# Requirement 2: the scratch bucket is not backed up.
 vol_hits, vol_tags = matches[EXCLUDED]
 if vol_hits:
     sid, sel = vol_hits[0]
@@ -301,7 +265,7 @@ ck.require(not vol_points,
            f"({[p['RecoveryPointArn'] for p in vol_points][:3]}); requirement 2 is that the "
            f"scratch bucket is not backed up by {PLAN}")
 
-# --- requirement 3: the seeded plan, vault and resources are still there ------
+# Requirement 3: the seeded plan, vault and resources are still in place.
 rule_vaults = {r.get("TargetBackupVaultName") for r in plan.get("Rules", [])}
 ck.require(VAULT in rule_vaults,
            f"no rule on {PLAN} targets vault {VAULT} any more (rules target {rule_vaults}); "

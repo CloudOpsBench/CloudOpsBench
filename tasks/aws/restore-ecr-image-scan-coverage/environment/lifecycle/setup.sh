@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Creates ECR repositories in two regions with a registry scanning configuration
+# that matches only some of them, cross-region replication, and an EventBridge
+# rule that forwards scan events for one repository to an SNS topic. The seeded
+# state is recorded in seed_state.json for the checker.
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
@@ -7,7 +11,7 @@ ACCT="$(aws sts get-caller-identity --query Account --output text)"
 TAGK="Project"
 TAGV="scanpolicy-demo"
 
-# --- clean any residue from an earlier run in this account/region -------------------------
+# Remove leftovers from an earlier run.
 for r in $(aws ecr describe-repositories --region "$REGION" --query 'repositories[].repositoryName' --output text 2>/dev/null); do
   arn="arn:aws:ecr:${REGION}:${ACCT}:repository/${r}"
   if aws ecr list-tags-for-resource --resource-arn "$arn" --region "$REGION" \
@@ -57,7 +61,7 @@ done
 for r in "$APP1" "$APP2" "$APP3" "$APP4" "$MIRROR"; do
   aws ecr create-repository --repository-name "$r" --region "$REGION" \
     --tags "Key=${TAGK},Value=${TAGV}" >/dev/null
-  # every repository-level scan setting reads healthy
+  # Repository-level scanOnPush is enabled on every repository.
   aws ecr put-image-scanning-configuration --repository-name "$r" --region "$REGION" \
     --image-scanning-configuration scanOnPush=true >/dev/null
 done
@@ -74,7 +78,7 @@ aws ecr create-repository --repository-name "$APP5" --region "$WEST"   --tags "K
 aws ecr put-image-scanning-configuration --repository-name "$APP5" --region "$WEST"   --image-scanning-configuration scanOnPush=true >/dev/null
 aws ecr put-registry-scanning-configuration --region "$WEST" --scan-type BASIC --rules '[]' >/dev/null
 
-# images built here are replicated on to the second registry
+# Replicate svc-* repositories to the registry in the second region.
 aws ecr put-replication-configuration --region "$REGION" --replication-configuration "$(
   python3 - "$ACCT" "$WEST" <<'PYR'
 import json,sys

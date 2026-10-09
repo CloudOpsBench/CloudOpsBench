@@ -1,3 +1,9 @@
+"""Check that every alarm tagged App=nightbell notifies its region's App=nightbell SNS topic.
+
+Passes when the tagged topics still exist with their tag, every tagged metric or composite
+alarm in any region has its region's tagged topic as an alarm action and keeps its tag,
+and all other alarms keep their configuration and tags.
+"""
 import boto3
 import checkkit as ck
 

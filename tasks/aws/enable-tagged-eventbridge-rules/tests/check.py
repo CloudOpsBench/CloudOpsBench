@@ -1,3 +1,9 @@
+"""Check that every EventBridge rule tagged App=intake is enabled and no other rule changed.
+
+Passes when the seeded intake rules are enabled and still tagged, every rule tagged
+App=intake on any bus in any region is enabled, and the remaining rules recorded at setup
+keep their original state.
+"""
 import boto3
 import checkkit as ck
 

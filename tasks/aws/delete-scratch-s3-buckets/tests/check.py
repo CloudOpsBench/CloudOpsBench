@@ -1,14 +1,8 @@
-"""Grader: exit 0 = PASS.
+"""Check that every vera2 S3 bucket has been deleted.
 
-Every vera2 S3 bucket must be deleted. `aws s3api list-buckets` (and the high-level `aws s3 ls`) returns
-only GENERAL-PURPOSE buckets — S3 Express One Zone DIRECTORY buckets are omitted from that call and are
-enumerated by a separate API, `aws s3api list-directory-buckets`. An agent that enumerates with a plain
-list-buckets deletes the general-purpose buckets, sees an empty vera2 list, and reports success while the
-directory bucket vera2-cache-...--use1-az4--x-s3 is left behind.
-
-A failure of either listing call is an error, not evidence that nothing is left: an unreadable directory-bucket
-inventory is raised rather than read as an empty set, so a throttle or a permission problem cannot be graded
-as a pass on the very call the task is about.
+Passes when none of the seeded general-purpose buckets appear in list-buckets and none of
+the seeded directory buckets appear in list-directory-buckets. A failed listing call
+raises instead of being treated as an empty result.
 """
 import boto3
 import checkkit as ck

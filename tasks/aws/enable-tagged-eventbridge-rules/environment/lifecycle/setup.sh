@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Removes rules left by earlier runs, then creates EventBridge rules tagged App=intake
+# (one enabled and one disabled on the default bus, one disabled on a custom bus in a
+# second region) and a disabled rule tagged App=drill. Records the rules and the state
+# of every other rule in seed_state.json.
 set -euo pipefail
 python3 <<'PY'
 import json, os, random, subprocess, sys, time

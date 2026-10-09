@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Replaces the SNS topic policy with an own-account grant, clears the SQS queue
+# policy, deletes the Kinesis resource policy, and removes statements for
+# principals outside this account from the HealthOmics S3 access policy.
 set -uo pipefail
 export AWS_PAGER=""
 REGION="${AWS_REGION:-us-east-1}"

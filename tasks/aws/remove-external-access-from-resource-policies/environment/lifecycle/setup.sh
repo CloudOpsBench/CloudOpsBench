@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds an SNS topic and SQS queue with wildcard-principal policies, a Kinesis
+# stream whose resource policy grants an external account, and a HealthOmics
+# sequence store whose S3 access policy grants the same external account.
+# Resource identifiers are written to seed_state.json.
 set -euo pipefail
 export AWS_PAGER=""
 REGION="${AWS_REGION:-us-east-1}"

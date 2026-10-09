@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the repositories, EventBridge rule and SNS topic recorded in
+# seed_state.json and resets the registry scanning and replication configuration.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 S=seed_state.json

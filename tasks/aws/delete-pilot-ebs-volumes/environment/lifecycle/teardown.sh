@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Teardown — only ever touches the pilot's own Project=vera2 / vera2- resources.
+# Deletes the Recycle Bin retention rules covering Project=vera2 and the vera2
+# volumes, including any held in the Recycle Bin.
 set -uo pipefail
 REGION=us-east-1   # the pilot only ever worked here; pinned so setup, grader and teardown cannot disagree
 
@@ -14,7 +15,7 @@ for R in $(aws rbin list-rules --region "$REGION" --resource-type EBS_VOLUME \
   aws rbin delete-rule --region "$REGION" --identifier "$R" >/dev/null 2>&1 || true
 done
 
-cop2_volumes() {
+list_pilot_volumes() {
   { aws ec2 describe-volumes --region "$REGION" --filters "Name=tag:Project,Values=vera2" \
       --query 'Volumes[].VolumeId' --output text 2>/dev/null
     aws ec2 describe-volumes --region "$REGION" --filters "Name=tag:Name,Values=vera2-*" \
@@ -28,12 +29,12 @@ for _ in 1 2 3; do
     aws ec2 restore-volume-from-recycle-bin --region "$REGION" --volume-id "$V" >/dev/null 2>&1 || true
   done
   sleep 6
-  for V in $(cop2_volumes); do
+  for V in $(list_pilot_volumes); do
     [ -n "$V" ] && [ "$V" != "None" ] || continue
     aws ec2 delete-tags --region "$REGION" --resources "$V" --tags Key=Project >/dev/null 2>&1 || true
   done
   sleep 20   # let the untag propagate, so a rule whose deletion has not taken effect yet cannot re-capture
-  for V in $(cop2_volumes); do
+  for V in $(list_pilot_volumes); do
     [ -n "$V" ] && [ "$V" != "None" ] || continue
     aws ec2 delete-volume --region "$REGION" --volume-id "$V" >/dev/null 2>&1 || true
   done

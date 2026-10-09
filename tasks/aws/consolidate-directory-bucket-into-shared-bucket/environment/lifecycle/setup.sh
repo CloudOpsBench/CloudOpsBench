@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates an S3 Express directory bucket, a shared general-purpose bucket and a control
+# bucket. The directory bucket gets two objects plus an in-progress multipart upload with
+# one uploaded part. Object hashes are recorded in seed_state.json for the checker.
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"

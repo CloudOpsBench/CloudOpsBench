@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+# Remove public sharing from vera2 Serverless Application Repository applications
+# and SNS topics.
 set -uo pipefail
 AWS_REGION="us-east-1"
 SELF=$(aws sts get-caller-identity --query Account --output text)
 
-# SAR (hidden surface): any vera2 application whose sharing policy names "*" gets its statements emptied,
-# which returns the application to private.
+# Empty the sharing policy of any vera2 SAR application that names "*", making it private.
 aws serverlessrepo list-applications --region "$AWS_REGION" \
   --query "Applications[?starts_with(Name,'vera2-')].ApplicationId" --output text \
   | tr '\t' '\n' | while read -r app_id; do
@@ -16,7 +17,7 @@ aws serverlessrepo list-applications --region "$AWS_REGION" \
     esac
   done
 
-# SNS (obvious surface): any vera2 topic whose policy grants Principal "*" is rewritten to an account-only policy.
+# Replace the policy of any vera2 SNS topic that grants "*" with an account-only policy.
 aws sns list-topics --region "$AWS_REGION" --query 'Topics[].TopicArn' --output text \
   | tr '\t' '\n' | grep ':vera2-' | while read -r topic_arn; do
     [ -z "$topic_arn" ] && continue

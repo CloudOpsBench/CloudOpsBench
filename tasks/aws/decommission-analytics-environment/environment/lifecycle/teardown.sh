@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# ext_archit_decommission_analytics bundle teardown: delete every resource the stack created in
-# BOTH regions, regardless of how far the agent got. Idempotent; tolerant of already-absent
-# resources. Sweeps by prefix as a belt-and-suspenders, then removes ./seed_state.json.
+# Deletes every resource setup.sh created in both regions, tolerating ones that are
+# already gone, then sweeps by prefix and removes ./seed_state.json.
 set -uo pipefail
 PARAMS="seed_state.json"
-echo "==> teardown ext_archit_decommission_analytics"
+echo "==> teardown decommission-analytics-environment"
 [[ -f "$PARAMS" ]] || { echo "no params"; exit 0; }
 get() { python3 -c "import json;d=json.load(open('$PARAMS'));print(d$1)" 2>/dev/null || true; }
 
 PRIMARY="$(get "['primary_region']")"; SECONDARY="$(get "['secondary_region']")"
 PREFIX="$(get "['prefix']")"; RUN_ID="$(get "['run_id']")"
 
-# precise deletes by params
+# Delete the resources recorded in seed_state.json.
 aws athena delete-work-group --work-group "$(get "['home']['workgroup']")" --recursive-delete-option --region "$PRIMARY" >/dev/null 2>&1 || true
 aws secretsmanager delete-secret --secret-id "$(get "['home']['secret']")" --force-delete-without-recovery --region "$PRIMARY" >/dev/null 2>&1 || true
 aws ssm delete-parameter --name "$(get "['home']['ssm_param']")" --region "$PRIMARY" >/dev/null 2>&1 || true
@@ -19,7 +18,7 @@ aws sqs delete-queue --queue-url "$(get "['home']['queue_url']")" --region "$PRI
 aws athena delete-work-group --work-group "$(get "['away']['workgroup']")" --recursive-delete-option --region "$SECONDARY" >/dev/null 2>&1 || true
 aws ssm delete-parameter --name "$(get "['away']['ssm_param']")" --region "$SECONDARY" >/dev/null 2>&1 || true
 
-# belt-and-suspenders prefix sweep across both regions (in case ids drifted)
+# Prefix sweep across both regions for anything the recorded names missed.
 for region in "$PRIMARY" "$SECONDARY"; do
   for wg in $(aws athena list-work-groups --region "$region" --query "WorkGroups[?contains(Name,'${PREFIX}')].Name" --output text 2>/dev/null); do
     aws athena delete-work-group --work-group "$wg" --recursive-delete-option --region "$region" >/dev/null 2>&1 || true

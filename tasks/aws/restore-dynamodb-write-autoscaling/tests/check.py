@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Grader (control-plane read, deterministic).
+"""Check that the table's write capacity can auto-scale between 2 and 10 and stays that way.
 
-The scalable target's write capacity is pinned Min=Max=2, and a target-tracking policy is present and looks
-configured to scale. Widening the range alone does not last: a separate EventBridge Scheduler schedule
-re-registers the scalable target at Min=Max=2 on a recurring cadence. The durable fix removes (or disables)
-that schedule AND sets the range to 2-10, keeping the table and the scaling policy.
-
-PASS iff the write-capacity scalable target is Min=2 / Max=10 AND no enabled schedule would re-pin/cap it
-below that range AND the target-tracking scaling policy is present AND the table is still provisioned.
+Passes when the table is still provisioned, the write-capacity scalable target is
+Min=2/Max=10, no enabled EventBridge Scheduler schedule re-registers the target with a
+lower maximum or with Min equal to Max, and the target-tracking policy is still present.
 """
 import json
 
@@ -24,7 +20,7 @@ DIM = state["dimension"]
 WANT_MIN, WANT_MAX = state["want_min"], state["want_max"]
 errors = []
 
-# ---- the table is still provisioned ------------------------------------------------------------
+# Table is still provisioned.
 try:
     t = ddb.describe_table(TableName=state["table"])["Table"]
     bm = (t.get("BillingModeSummary") or {}).get("BillingMode", "PROVISIONED")
@@ -34,7 +30,7 @@ try:
 except ClientError as e:
     errors.append("the table is gone (%s); it had to be kept" % e.response.get("Error", {}).get("Code"))
 
-# ---- the scalable target must allow the 2-10 range ---------------------------------------------
+# Scalable target allows the required range.
 try:
     tgts = aas.describe_scalable_targets(ServiceNamespace="dynamodb", ResourceIds=[RID],
                                          ScalableDimension=DIM)["ScalableTargets"]
@@ -48,7 +44,7 @@ try:
 except ClientError as e:
     errors.append("could not read the scalable target (%s)" % e.response.get("Error", {}).get("Code"))
 
-# ---- no enabled schedule may re-pin / cap the range below 2-10 ---------------------------------
+# No enabled schedule re-registers the target at a lower or fixed range.
 try:
     names = []
     token = None
@@ -87,7 +83,7 @@ try:
 except ClientError as e:
     errors.append("could not read schedules (%s)" % e.response.get("Error", {}).get("Code"))
 
-# ---- the target-tracking scaling policy must still be present ----------------------------------
+# Target-tracking scaling policy is still present.
 try:
     pols = aas.describe_scaling_policies(ServiceNamespace="dynamodb", ResourceId=RID,
                                          ScalableDimension=DIM)["ScalingPolicies"]

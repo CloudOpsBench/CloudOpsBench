@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
+# Creates the checkout db-endpoint SSM parameter with the legacy value and pins
+# the release-current label to version 1.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="${RANDOM}${RANDOM}"
 PARAM="/vera2/${SUF}/checkout/db-endpoint"
 
-# clean any stale copy of this exact name
+# Remove any stale parameter with the same name.
 aws ssm delete-parameter --name "$PARAM" --region "$REGION" >/dev/null 2>&1 || true
 
 aws ssm put-parameter --name "$PARAM" --type String \

@@ -1,9 +1,8 @@
-"""Grader: exit 0 = PASS.
+"""Check that every seeded vera2 ACM certificate has been deleted.
 
-Every vera2 ACM certificate must be deleted. `aws acm list-certificates` returns only RSA_1024/RSA_2048
-certificates by DEFAULT (the Includes.keyTypes filter) — RSA_4096 and EC certs are omitted unless the
-caller passes --includes keyTypes=... . The vera2-admin certificate is RSA-4096, so an agent that enumerates
-with a plain `list-certificates` never sees it and leaves it behind while believing it deleted them all.
+Passes when describe-certificate reports ResourceNotFoundException for each
+certificate ARN in the seed state. One seeded certificate is RSA-4096, which
+`acm list-certificates` omits unless --includes keyTypes=... is passed.
 """
 import boto3, botocore
 import checkkit as ck

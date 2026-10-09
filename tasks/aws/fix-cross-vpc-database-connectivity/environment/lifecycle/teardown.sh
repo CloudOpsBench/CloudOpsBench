@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Optional. A lane nuke resets cloud state after every run, so this is a courtesy best-effort
-# cleanup - never fail the run on cleanup trouble.
+# Best-effort cleanup of the peering connection and both VPCs; never fails.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

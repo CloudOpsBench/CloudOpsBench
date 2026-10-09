@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Reference fix. Discovers everything at runtime; never reads seed_state.json.
+# In each region named in the relay role's policy: recreates Infrequent Access
+# /svc/ log groups in the Standard class, removes per-group subscription filters,
+# and installs an account-level subscription filter policy to the audit stream
+# that excludes the vendor log group.
 set -euo pipefail
 # Log group names start with "/"; keep Git Bash from rewriting them as Windows paths.
 export MSYS_NO_PATHCONV=1

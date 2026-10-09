@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
+# Seeds an SNS topic with a wildcard-principal policy and a Serverless
+# Application Repository application shared publicly, both named vera3-*.
+# Identifiers are written to seed_state.json.
 set -uo pipefail
 zone="us-east-1"
 stamp="$(date +%s)${RANDOM}"
 who=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "000000000000")
 
-# --- scrub leftovers from earlier runs so a rerun starts clean ---
+# Remove leftovers from earlier runs.
 for old in $(aws sns list-topics --region "$zone" --query 'Topics[].TopicArn' --output text 2>/dev/null | tr '\t' '\n' | grep ':vera3-' || true); do
   aws sns delete-topic --topic-arn "$old" --region "$zone" 2>/dev/null || true
 done

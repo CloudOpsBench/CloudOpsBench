@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Sets the order-error alarm threshold to 100 and deletes any schedule whose
+# target rewrites that alarm.
 set -euo pipefail
 
 python3 - <<'PY'

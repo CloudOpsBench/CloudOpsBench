@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# teardown.sh — courtesy cleanup
+# Deletes the buckets, role and boundary policy recorded in seed_state.json and
+# schedules the KMS key for deletion.
 set -euo pipefail
 
 if [ -f seed_state.json ]; then

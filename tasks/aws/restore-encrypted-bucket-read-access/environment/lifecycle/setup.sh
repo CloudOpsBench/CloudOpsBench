@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# setup.sh — provisions starting cloud state for "The Ciphertext Ceiling"
+# Creates a KMS-encrypted data bucket, an SSE-S3 archive bucket, and an app role
+# with a permissions boundary. Neither the role's identity policy nor the
+# boundary allows kms:Decrypt. Writes TICKET.md to the agent workspace.
 set -euo pipefail
 echo "setup.sh version: v1 (kms-boundary-lockout)"
 
@@ -29,8 +31,8 @@ KEY_ID="$(aws kms create-key \
 KEY_ARN="$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)"
 aws kms create-alias --alias-name "alias/ciph-data-${SUFFIX}" --target-key-id "${KEY_ID}" || true
 echo "Key: ${KEY_ARN}"
-# Default key policy delegates to IAM (account root) — so IAM identity policies
-# and permissions boundaries govern access. Both causes live in IAM, by design.
+# The default key policy delegates to IAM, so identity policies and permissions
+# boundaries govern access to the key.
 
 echo "Creating data bucket (SSE-KMS): ${DATA_BUCKET}"
 create_bucket "${DATA_BUCKET}"
@@ -46,13 +48,13 @@ aws s3api put-bucket-encryption --bucket "${DATA_BUCKET}" --server-side-encrypti
 
 echo "Creating archive bucket (SSE-S3): ${ARCHIVE_BUCKET}"
 create_bucket "${ARCHIVE_BUCKET}"
-# default SSE-S3 (AES256) — no KMS involved; reads work for the role as-is
+# The archive bucket keeps default SSE-S3 encryption, so reading it needs no KMS permission.
 
 echo "reporting dataset v1" > /tmp/obj.txt
 aws s3 cp /tmp/obj.txt "s3://${DATA_BUCKET}/reports/q1.txt"
 aws s3 cp /tmp/obj.txt "s3://${ARCHIVE_BUCKET}/reports/q1.txt"
 
-# Permissions boundary: allows ONLY S3 read — no KMS at all. Cause B.
+# Permissions boundary that allows S3 read only.
 cat > /tmp/boundary.json <<EOF
 {
   "Version": "2012-10-17",
@@ -76,8 +78,7 @@ BOUNDARY_ARN="$(aws iam create-policy --policy-name "${BOUNDARY_POLICY}" \
   --query 'Policy.Arn' --output text)"
 echo "Boundary: ${BOUNDARY_ARN}"
 
-# App role with the boundary attached. Identity policy: S3 read only — no
-# kms:Decrypt. Cause A.
+# App role with the boundary attached and an identity policy that allows S3 read only.
 cat > /tmp/trust.json <<'EOF'
 {
   "Version": "2012-10-17",
@@ -114,7 +115,7 @@ EOF
 aws iam put-role-policy --role-name "${APP_ROLE}" --policy-name "app-read-access" \
   --policy-document file:///tmp/identity.json
 
-# seed_state.json — grader-only
+# State file read by the checker.
 cat > seed_state.json <<EOF
 {
   "app_role": "${APP_ROLE}",

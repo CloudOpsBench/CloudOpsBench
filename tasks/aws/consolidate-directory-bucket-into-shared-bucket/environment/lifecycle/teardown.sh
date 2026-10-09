@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Empties and deletes the three buckets recorded in seed_state.json.
 set -euo pipefail
 
 if [ ! -f seed_state.json ]; then

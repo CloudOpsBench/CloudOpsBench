@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
+# Deregisters the vera2- AMIs and deletes the vera2- SageMaker images, then waits
+# for the asynchronous SageMaker deletions to finish.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
-# 1) AMIs owned by this account and named vera2-*.
 for I in $(aws ec2 describe-images --region "$REGION" --owners self --filters "Name=name,Values=vera2-*" \
              --query 'Images[].ImageId' --output text 2>/dev/null | tr '\t' '\n'); do
   [ -n "$I" ] && [ "$I" != "None" ] || continue

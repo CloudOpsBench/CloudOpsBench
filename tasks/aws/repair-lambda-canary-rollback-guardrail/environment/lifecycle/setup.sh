@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds a Lambda function with stable and candidate versions behind a weighted
+# `live` alias, a CloudWatch error alarm, and a CodeDeploy application and
+# deployment group with rollback and alarm monitoring disabled. Writes
+# task_context.json.
 set -euo pipefail
 
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"

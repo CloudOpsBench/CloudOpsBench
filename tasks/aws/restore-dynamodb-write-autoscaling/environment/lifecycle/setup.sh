@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates a provisioned DynamoDB table whose write-capacity scalable target is
+# pinned at Min=Max=2 with a target-tracking policy, plus an EventBridge Scheduler
+# schedule that re-registers the target at Min=Max=2 every 30 minutes.
 set -euo pipefail
 
 python3 - <<'PY'

@@ -1,4 +1,9 @@
-"""Grade lossless consolidation from an S3 Express directory bucket into shared S3."""
+"""Check that the pilot dataset was consolidated into the shared bucket.
+
+Passes when all three buckets still exist, the directory bucket has no objects and no
+multipart uploads, the shared bucket holds exactly the pilot payloads plus its original
+object with matching SHA-256 and size, and the control bucket is unchanged.
+"""
 import hashlib
 
 import boto3

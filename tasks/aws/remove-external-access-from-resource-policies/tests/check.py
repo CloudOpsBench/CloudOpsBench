@@ -1,19 +1,8 @@
-"""Grader: exit 0 = PASS.
+"""Check that no seeded resource policy grants access outside this account.
 
-A vera2 resource is "open to the outside" if a resource-based policy statement (Effect: Allow) grants access to a
-wildcard principal "*" not genuinely pinned to this account by a Condition, or to an AWS account other than ours. This
-grader checks the exact seeded resources across the services that carry a resource policy -- SNS and SQS (mainstream),
-AND the two a service sweep tends to miss: a Kinesis stream resource-policy (returned only by get-resource-policy,
-never by describe-stream) and an AWS HealthOmics sequence-store S3 access policy (returned only by
-get-s3-access-policy, never by get-sequence-store). It checks the seeded resources by their recorded identifiers, not
-a vera2- prefix sweep -- the namespace is shared across tasks, so another rollout's residue must never false-fail a
-correct solver here. A Condition counts as pinning only when it binds a real account-scoping key
-(aws:PrincipalAccount, aws:SourceAccount, aws:SourceOwner, aws:PrincipalArn, aws:PrincipalOrgID/OrgPaths) to this
-account -- a self-assigned key such as a principal tag does not bind the caller to an account. Own-account access on
-the sequence store must REMAIN (the prompt promises it): the store's S3 access policy must still grant this account,
-so wiping the whole policy fails. Every seeded resource must still exist (secured, not deleted). Open verdicts are
-re-read with a short backoff so a just-written policy is never misread. Reads run through the current awscli so
-grading does not depend on the host boto3 version.
+Passes when the SNS topic, SQS queue, Kinesis stream and HealthOmics sequence store still
+exist, none allows a wildcard principal (unless a condition pins it to this account) or
+another account, and the sequence store's S3 access policy still grants this account.
 """
 import json
 import time
@@ -26,6 +15,7 @@ R = seed["region"]
 ACCT = seed["account"]
 
 
+# Reads go through the aws CLI so the check does not depend on the installed boto3 version.
 def aws(*args):
     return subprocess.run(["aws", "--region", R, "--output", "json", *args],
                           capture_output=True, text=True)
@@ -63,8 +53,10 @@ def _pinning_entries(cond):
 
 
 def condition_pins_to_account(cond):
-    """True only for a Condition that genuinely binds the caller to this account. A key the caller controls
-    (for example a principal tag) never pins, even if its value happens to contain our account id."""
+    """True if the Condition binds the caller to this account through an account-scoping key.
+
+    Keys the caller controls, such as principal tags, do not count.
+    """
     for k, vals in _pinning_entries(cond):
         if not vals:
             continue
@@ -169,6 +161,7 @@ def scan_open():
     return found
 
 
+# Re-read with a short wait so a just-written policy is not misread.
 open_resources = scan_open()
 for _ in range(2):
     if not open_resources:

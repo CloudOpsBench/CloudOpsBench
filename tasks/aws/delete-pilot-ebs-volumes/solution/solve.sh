@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the Recycle Bin retention rule covering Project=vera2, restores any
+# volumes it captured, and deletes the pilot volumes.
 set -uo pipefail
 REGION=us-east-1   # the pilot only ever worked here; pinned so setup, grader and teardown cannot disagree
 for R in $(aws rbin list-rules --region "$REGION" --resource-type EBS_VOLUME --query 'Rules[].Identifier' --output text 2>/dev/null | tr '\t' '\n'); do

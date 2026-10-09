@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes the resources recorded in seed_state.json or cleanup_state.json.
 set -uo pipefail
 export AWS_PAGER=""
 

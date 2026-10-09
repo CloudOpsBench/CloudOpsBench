@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Courtesy cleanup. A lane nuke resets state anyway, so never fail the run here.
+# Best-effort cleanup of the resources recorded in seed_state.json. Errors are
+# ignored so teardown never fails the run.
 set -uo pipefail
 python3 - <<'PY' 2>/dev/null || true
 import boto3, json, os

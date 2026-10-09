@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Completes the in-progress multipart upload in the directory bucket, copies every object
+# to the shared bucket with a SHA-256 comparison, then deletes the source objects.
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"

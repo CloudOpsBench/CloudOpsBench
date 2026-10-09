@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cleanup. Never fails; every step tolerates partial/agent-modified state.
+# Best-effort cleanup of everything setup created; never fails.
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
 

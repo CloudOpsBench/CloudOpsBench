@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Courtesy cleanup; the lane nukes state anyway. Never fails.
+# Best-effort removal of everything setup.sh created. Never fails.
 set -uo pipefail
 python3 - <<'PY' || true
 import time, boto3

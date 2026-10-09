@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Creates two vera2-* metric alarms and one vera2-* composite alarm, all with actions
+# enabled, and records their names in seed_state.json.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="${RANDOM}${RANDOM}"

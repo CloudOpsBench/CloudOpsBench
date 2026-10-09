@@ -1,17 +1,9 @@
-"""Seeds the metering export pipeline.
+"""Seed the metering export pipeline.
 
-Two live delivery streams disagree about where interval readings belong. The one whose NAME
-matches the analytics table lands in the compliance archive bucket; the one that actually
-writes into the curated location the catalog table reads is named after something else. All
-three exporters point at the name-matching stream, and the Lambda exporter's live alias is
-pinned to a published version, so updating the function's configuration does not change what
-the alias serves.
-
-The stream that lands at the curated location is itself unable to write there: its delivery
-role grants the archive bucket, not the one it points at. Nothing about the stream says so -
-describe-delivery-stream reads perfectly - so simply repointing the exporters at it moves
-nothing. The Glue job's run-time argument is pinned in NonOverridableArguments, so editing
-DefaultArguments alone is inert as well.
+Creates two Firehose delivery streams (one to the archive bucket, one to the
+curated location the catalog table reads), Lambda, Batch, Glue and CodeBuild
+exporters that all name the archive stream, and delivery roles that can write
+only to the archive bucket. Writes seed_state.json.
 """
 import io
 import json
@@ -39,7 +31,7 @@ CURATED = "meter-curated-%s-%s" % (ACCT, SFX)
 ARCHIVE = "meter-archive-%s-%s" % (ACCT, SFX)
 PREFIX = "interval/readings/"
 
-# The stream whose name matches the analytics table is the one landing in the archive.
+# The stream named after the analytics table delivers to the archive bucket.
 LURE_STREAM = "meter-interval-readings-feed-%s" % SFX
 REAL_STREAM = "grid-telemetry-delivery-%s" % SFX
 
@@ -85,16 +77,14 @@ def delivery_policy(buckets):
          "Resource": "arn:aws:logs:%s:%s:log-group:/aws/kinesisfirehose/*" % (REGION, ACCT)}]}
 
 
-# Both delivery roles are created able to write either bucket, so stream creation validates,
-# and are narrowed to the ARCHIVE bucket only once the streams exist. That leaves the curated
-# stream reading perfectly while its delivery role cannot write where it points.
+# Both delivery roles start with write access to both buckets so stream creation
+# validates; they are narrowed to the archive bucket once the streams are active.
 archive_role = make_role(FH_ARCHIVE_ROLE, "firehose.amazonaws.com",
                          delivery_policy([CURATED, ARCHIVE]))
 curated_role = make_role(FH_CURATED_ROLE, "firehose.amazonaws.com",
                          delivery_policy([CURATED, ARCHIVE]))
 
-# PutRecord on every stream in the account, so an exporter pointed at the wrong stream still
-# succeeds: nothing in this task is discovered by watching a call fail.
+# The exporter role may PutRecord on any delivery stream in the account.
 fn_role = make_role(FN_ROLE, "lambda.amazonaws.com", {"Version": "2012-10-17", "Statement": [
     {"Effect": "Allow", "Action": ["firehose:PutRecord", "firehose:PutRecordBatch"],
      "Resource": "arn:aws:firehose:%s:%s:deliverystream/*" % (REGION, ACCT)},
@@ -123,8 +113,7 @@ def make_stream(name, bucket, role):
 make_stream(LURE_STREAM, ARCHIVE, archive_role)
 make_stream(REAL_STREAM, CURATED, curated_role)
 
-# The archive already holds historical exports; the curated location is empty. That is the
-# symptom the prompt describes, and it says nothing about which stream writes where.
+# Historical exports go in the archive bucket; the curated location stays empty.
 for day in ("2026/08/26", "2026/08/27", "2026/08/28"):
     body = json.dumps({"meter_id": "M-1001", "read_ts": day, "kwh": 4.5}) + "\n"
     s3.put_object(Bucket=ARCHIVE, Key="%s%s/meter-export-1.json" % (PREFIX, day),
@@ -245,8 +234,7 @@ for name in (LURE_STREAM, REAL_STREAM):
         time.sleep(5)
 
 
-# Both delivery roles now grant the ARCHIVE bucket only. For the archive stream that is
-# consistent; for the curated stream the destination and the grant name different buckets.
+# Narrow both delivery roles to the archive bucket.
 for role_name in (FH_ARCHIVE_ROLE, FH_CURATED_ROLE):
     iam.put_role_policy(RoleName=role_name, PolicyName="inline",
                         PolicyDocument=json.dumps(delivery_policy([ARCHIVE])))

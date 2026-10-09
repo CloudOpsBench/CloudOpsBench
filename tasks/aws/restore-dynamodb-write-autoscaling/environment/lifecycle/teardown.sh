@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes the vera2-orders schedules, roles, scalable targets and tables.
 set -euo pipefail
 
 python3 - <<'PY'

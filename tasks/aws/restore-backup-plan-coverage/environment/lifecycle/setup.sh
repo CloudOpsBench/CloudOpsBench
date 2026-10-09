@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds an AWS Backup plan, vault and tag-based selection, plus a fleet of two
+# DynamoDB tables, two EFS file systems and a scratch S3 bucket, in a state where
+# the plan does not protect the whole fleet. The account's backup opt-in settings
+# are saved to .optin_before.json for teardown.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -52,11 +56,8 @@ def retry(fn, tries=10, delay=6, ok_codes=()):
 def settles(read, want, label, tries=45, delay=4, transient=()):
     """Poll a just-created resource until it reads `want`.
 
-    EC2 and EFS are both eventually consistent right after a create call: a
-    describe on an id the create call just returned can answer NotFound for a
-    few seconds. The botocore waiters treat that as terminal, which is what
-    broke v2 on the platform while four local runs passed, so every post-create
-    poll in this setup tolerates the not-found window itself.
+    EC2 and EFS are eventually consistent right after a create call, so a describe
+    can answer NotFound for a few seconds; this tolerates that window.
     """
     for _ in range(tries):
         try:
@@ -78,7 +79,7 @@ s3.put_bucket_tagging(Bucket=SCRATCH, Tagging={"TagSet": [
     {"Key": "fleet", "Value": "vera"}]})
 SCRATCH_ARN = f"arn:aws:s3:::{SCRATCH}"
 
-# --- IAM role the backup selection runs as -----------------------------------
+# IAM role the backup selection runs as
 trust = {"Version": "2012-10-17", "Statement": [{
     "Effect": "Allow",
     "Principal": {"Service": "backup.amazonaws.com"},
@@ -97,7 +98,7 @@ iam.put_role_policy(
         "Action": "elasticfilesystem:*",
         "Resource": "*"}]}))
 
-# --- fleet resources ----------------------------------------------------------
+# fleet resources
 for name in (T_ORDERS, T_AUDIT):
     ddb.create_table(TableName=name,
                      AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
@@ -110,7 +111,7 @@ tables = {}
 for name in (T_ORDERS, T_AUDIT):
     tables[name] = ddb.describe_table(TableName=name)["Table"]["TableArn"]
 
-# Fault 1: only orders carries the tag the selection matches on.
+# Only orders carries the tag the selection matches on.
 retry(lambda: ddb.tag_resource(ResourceArn=tables[T_ORDERS],
                  Tags=[{"Key": TAG_KEY, "Value": TAG_VALUE},
                        {"Key": "fleet", "Value": "vera"}]))
@@ -148,7 +149,7 @@ retry(lambda: efs.put_file_system_policy(
          "Resource": "*"}]})))
 
 
-# --- vault, plan, tag-based selection -----------------------------------------
+# vault, plan, tag-based selection
 backup.create_backup_vault(BackupVaultName=VAULT,
                            BackupVaultTags={"fleet": "vera"})
 
@@ -186,7 +187,7 @@ for want, key in ((False, "EFS"), (False, "S3"), (True, "DynamoDB")):
     if settings.get(key) is not want:
         raise SystemExit(f"setup: opt-in for {key} seeded as {settings.get(key)}, wanted {want}")
 
-# --- prove the seeded state is the broken one --------------------------------
+# confirm the seeded state
 try:
     backup.start_backup_job(BackupVaultName=VAULT, ResourceArn=FS_ARN, IamRoleArn=ROLE_ARN)
     raise SystemExit("setup: a file-system backup was accepted, so the opt-in gap is absent")

@@ -1,7 +1,8 @@
-"""Grader: exit 0 = PASS. Every vera2 S3 bucket must be deleted — general-purpose AND table buckets. `aws s3api
-list-buckets` returns only general-purpose buckets; S3 TABLE buckets (GA Dec 2024) are a separate bucket type
-in a separate CLI service, `aws s3tables list-table-buckets`, and are omitted by list-buckets (and by
-list-directory-buckets). A solver that only clears list-buckets leaves the table bucket in place.
+"""Check that both seeded vera2 S3 buckets are deleted.
+
+Passes when the general-purpose bucket no longer exists and the table bucket is absent from
+`aws s3tables list-table-buckets`. Table buckets are a separate bucket type that
+`s3api list-buckets` does not return.
 """
 import json
 import subprocess
@@ -13,13 +14,12 @@ s3 = boto3.client("s3", region_name=seed["region"])
 
 def present():
     left = []
-    # general-purpose bucket
     try:
         s3.head_bucket(Bucket=seed["gp_bucket"])
         left.append(seed["gp_bucket"])
     except Exception:
         pass
-    # table buckets via the s3tables CLI (avoid boto3 service-model dependency)
+    # Table buckets are listed via the s3tables CLI to avoid depending on the boto3 service model.
     r = subprocess.run(
         ["aws", "s3tables", "list-table-buckets", "--region", seed["region"], "--output", "json"],
         capture_output=True, text=True,

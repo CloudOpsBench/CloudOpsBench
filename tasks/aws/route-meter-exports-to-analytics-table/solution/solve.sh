@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Finds the delivery stream that lands at the analytics table's S3 location,
+# grants its delivery role write access there, and repoints the Lambda, Batch,
+# CodeBuild and Glue exporters at it.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -18,7 +21,7 @@ batch = boto3.client("batch", region_name=REGION)
 
 SETTING = "EXPORT_DELIVERY_STREAM"
 
-# 1. Where does the analytics table actually read from?
+# Find where the analytics table reads from.
 target = None
 db_name = None
 for page in glue.get_paginator("get_databases").paginate():
@@ -33,7 +36,7 @@ if target is None:
     raise SystemExit("no interval_readings table found")
 print("table %s.interval_readings reads %s" % (db_name, target))
 
-# 2. Which delivery stream lands there? Names say nothing; the destination does.
+# Find the delivery stream that lands there, by destination rather than by name.
 streams = []
 last = None
 while True:
@@ -86,7 +89,7 @@ if decision != "allowed":
             break
     print("granted %s write access to %s" % (role_name, objects))
 
-# 3. The Lambda exporter: fix $LATEST, publish it, then move the alias onto the new version.
+# The Lambda exporter: fix $LATEST, publish it, then move the alias onto the new version.
 for page in lam.get_paginator("list_functions").paginate():
     for f in page["Functions"]:
         if not f["FunctionName"].startswith("meter-export-writer-"):
@@ -103,7 +106,7 @@ for page in lam.get_paginator("list_functions").paginate():
             lam.update_alias(FunctionName=fn, Name=alias["Name"], FunctionVersion=version)
             print("alias %s:%s -> version %s" % (fn, alias["Name"], version))
 
-# 4. The Batch job definition is immutable: register a new revision.
+# The Batch job definition is immutable: register a new revision.
 active = []
 for page in batch.get_paginator("describe_job_definitions").paginate(status="ACTIVE"):
     active.extend(page["jobDefinitions"])
@@ -145,7 +148,7 @@ for rgn in regions:
         cb.update_project(name=name, environment=env)
         print("codebuild %s in %s -> %s" % (name, rgn, wanted))
 
-# 6. The Glue job.
+# The Glue job.
 for page in glue.get_paginator("get_jobs").paginate():
     for job in page["Jobs"]:
         if not job["Name"].startswith("meter-export-nightly-"):

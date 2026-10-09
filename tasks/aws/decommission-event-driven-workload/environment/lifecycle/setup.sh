@@ -1,33 +1,26 @@
 #!/usr/bin/env bash
-# ext_archit_decommission_events bundle setup — discovery-ceiling decommission (AWS).
-# Hand-build a small event-driven stack via the CLI, every resource carrying the prefix
-# `aeb-<region>`. The agent is told to FULLY decommission it (nothing left behind). The
-# trap is the discovery ceiling: the obvious resources live in the home region, but
-# orphans hide in a DIFFERENT region (a per-region name sweep misses them) — and one
-# in-scope service is niche: EventBridge rules (`aws events list-rules`), which agents
-# routinely skip. NO TAGS (the prefix is in resource NAMES only) so the agent cannot dump
-# the inventory via the Resource Groups Tagging API — it must discover each resource
-# itself, per-service and per-region. Writes ground truth to ./seed_state.json (CWD).
+# Creates a small event-driven stack named with the prefix aeb-<region>, without
+# tags: an EventBridge rule, SQS queue and SNS topic in the home region, and an
+# EventBridge rule and SQS queue in a second region. Writes seed_state.json.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 PRIMARY="$AWS_REGION"
 if [[ "$PRIMARY" == "us-west-2" ]]; then SECONDARY="us-east-1"; else SECONDARY="us-west-2"; fi
 
-PREFIX="aeb-${PRIMARY}"   # deterministic; the prompt references it as aeb-{region}
+PREFIX="aeb-${PRIMARY}"
 RULE="${PREFIX}-rule"; QUEUE="${PREFIX}-queue"; TOPIC="${PREFIX}-topic"
 W_RULE="${PREFIX}-rule"; W_QUEUE="${PREFIX}-queue"
 
-echo "==> setup ext_archit_decommission_events (home $PRIMARY, prefix $PREFIX)"
+echo "==> setup decommission-event-driven-workload (home $PRIMARY, prefix $PREFIX)"
 
-# ── home region ($PRIMARY): obvious resources + the niche EventBridge rule ──────
-# Bare rule: no targets, so NO role is required. Disabled so it never fires.
+# Home region. The rule has no targets, so it needs no role; it is disabled so
+# it never fires.
 aws events put-rule --name "$RULE" --schedule-expression "rate(1 day)" --state DISABLED \
   --region "$PRIMARY" >/dev/null
 QUEUE_URL="$(aws sqs create-queue --queue-name "$QUEUE" --region "$PRIMARY" --query 'QueueUrl' --output text)"
 aws sns create-topic --name "$TOPIC" --region "$PRIMARY" >/dev/null
 
-# ── SECONDARY region ($SECONDARY): the orphans in the "forgotten" region ────────
-# A cross-region EventBridge rule (bare) + an SQS queue — the dominant trap.
+# Second region: an EventBridge rule and an SQS queue.
 aws events put-rule --name "$W_RULE" --schedule-expression "rate(1 day)" --state DISABLED \
   --region "$SECONDARY" >/dev/null
 W_QUEUE_URL="$(aws sqs create-queue --queue-name "$W_QUEUE" --region "$SECONDARY" --query 'QueueUrl' --output text)"

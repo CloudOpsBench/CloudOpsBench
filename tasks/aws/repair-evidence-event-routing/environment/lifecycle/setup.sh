@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds an S3 evidence bucket, archiver, retention and dead-letter queues, a
+# custom event bus with capture, recorder and retention rules, an SNS alert
+# topic and a Step Functions sealer. Several sources are seeded without a
+# working route to the archiver queue. Writes seed_state.json.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -31,7 +35,6 @@ ROLE_ARN=$(retry aws iam create-role --role-name "$ROLE" \
   --query Role.Arn --output text)
 rm -f ingest-trust.json
 
-# --- Queues.
 ARCH_URL=$(retry aws sqs create-queue --queue-name "$ARCH_Q" --query QueueUrl --output text)
 ARCH_ARN=$(retry aws sqs get-queue-attributes --queue-url "$ARCH_URL" \
   --attribute-names QueueArn --query Attributes.QueueArn --output text)
@@ -76,7 +79,7 @@ PY
 retry aws sqs set-queue-attributes --queue-url "$ARCH_URL" --attributes file://arch-attrs.json
 rm -f arch-attrs.json
 
-# --- Ingest role identity policy, so the ingest path is coherent both sides.
+# Identity policy letting the ingest role send to the archiver queue.
 python3 - "$ARCH_ARN" > ingest-perm.json <<'PY'
 import json
 import sys
@@ -88,8 +91,7 @@ retry aws iam put-role-policy --role-name "$ROLE" --policy-name send-to-archiver
   --policy-document file://ingest-perm.json
 rm -f ingest-perm.json
 
-# --- Retention worker queue policy: healthy, grants EventBridge (restraint 2's
-#     delivery leg must keep working).
+# Retention worker queue policy allowing EventBridge delivery.
 python3 - "$RET_ARN" > ret-attrs.json <<'PY'
 import json
 import sys
@@ -109,7 +111,6 @@ PY
 retry aws sqs set-queue-attributes --queue-url "$RET_URL" --attributes file://ret-attrs.json
 rm -f ret-attrs.json
 
-# --- The custom bus.
 retry aws events create-event-bus --name "$BUS" >/dev/null
 
 CAP_PATTERN="{\"source\":[\"aws.s3\"],\"detail-type\":[\"Object Created\"],\"detail\":{\"bucket\":{\"name\":[\"$BKT\"]}}}"
@@ -120,11 +121,8 @@ retry aws events put-targets --rule "$CAP_RULE" --event-bus-name "$BUS" \
   --targets "Id=archiver,Arn=$ARCH_ARN" >/dev/null
 
 TOPIC_ARN=$(retry aws sns create-topic --name "$ALERT_TOPIC" --query TopicArn --output text)
-# The intake-alert topic is one of the sources meant to feed the archive, and it is the
-# only one whose purpose was not stated on the resource itself - the rules carry
-# descriptions, the queues carry policies, and this carried nothing but its name. Say what
-# it feeds, so an inventory built from configuration finds it the way the others are found.
-# It stays UNSUBSCRIBED and UNGRANTED: what it is for is discoverable, wiring it up is not.
+# Label the alert topic with what it feeds. It is left without a subscription
+# or a queue-policy grant.
 retry aws sns set-topic-attributes --topic-arn "$TOPIC_ARN" \
   --attribute-name DisplayName --attribute-value "Evidence intake alerts (compliance archive source)"
 retry aws sns tag-resource --resource-arn "$TOPIC_ARN" \

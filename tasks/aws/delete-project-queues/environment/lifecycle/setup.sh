@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Creates two SQS queues and one MediaConvert queue named vera2-*, and writes
+# the region to seed_state.json.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="${RANDOM}${RANDOM}"

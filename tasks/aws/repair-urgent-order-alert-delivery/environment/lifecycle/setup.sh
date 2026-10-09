@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates an SNS topic, an SQS queue and a filtered subscription between them. The
+# queue policy names a retired topic ARN, the priority filter value is uppercase,
+# and RawMessageDelivery is left off.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -13,7 +16,6 @@ retry() { local n=0; until "$@"; do n=$((n+1)); [ "$n" -ge 10 ] && return 1; sle
 TOPIC_ARN=$(retry aws sns create-topic --name "$TOPIC" --query TopicArn --output text)
 STALE_TOPIC_ARN="arn:aws:sns:$REGION:$ACCT:fulfillment-alerts-topic-retired-$SFX"
 
-# --- Queue (subscription target).
 QUEUE_URL=$(retry aws sqs create-queue --queue-name "$QUEUE" --query QueueUrl --output text)
 QUEUE_ARN=$(aws sqs get-queue-attributes --queue-url "$QUEUE_URL" \
   --attribute-names QueueArn --query Attributes.QueueArn --output text)

@@ -1,8 +1,9 @@
-"""Grader for audit-relay-coverage-task. Exit 0 = PASS.
+"""Check that every /svc/ log group relays to the audit stream in its own region.
 
-Outcome first: everything the prompt asks for is proved by writing real log events and
-reading the audit streams. The structural checks that follow only enforce the prompt's
-restraints; none of them encodes why delivery would or would not work.
+Passes when log events written to each /svc/ log group, including probe groups created
+here, arrive in the regional audit stream, events from the vendor log group do not, the
+probe groups carry no subscription filters of their own, and the log groups, streams and
+relay role keep their seeded identity and settings.
 """
 import gzip
 import json
@@ -52,7 +53,7 @@ for r in REGIONS:
             f"keeps the name it has now",
         )
 
-# --- 1. functional: does every /svc/ log group actually reach its audit stream? ------------
+# Write marked log lines to every /svc/ log group and read them back from the audit streams.
 MARK = secrets.token_hex(6)
 PROBE = {r: f"/svc/relay-probe-{secrets.token_hex(6)}" for r in REGIONS}
 
@@ -111,9 +112,8 @@ for r in REGIONS:
 time.sleep(5)
 
 def write_lines(groups_by_region):
-    """Write every group's four lines. Safe to repeat: the tokens stay the same, and a
-    subscription forwards only what is ingested after it starts, so a group that begins
-    relaying late still delivers a later copy."""
+    """Write each group's lines. Repeatable: a subscription only forwards events ingested
+    after it starts, so resending covers groups that begin relaying late."""
     now = int(time.time() * 1000)
     for r in REGIONS:
         for g in groups_by_region.get(r, []):
@@ -172,7 +172,7 @@ def drain():
 
 
 def relay_state(groups):
-    """What is actually configured right now, for whoever reads this failure."""
+    """Describe the current subscription configuration for a failure message."""
     out = []
     for r in REGIONS:
         try:
@@ -255,7 +255,7 @@ if vendor_hits:
         f"/svc/ log group's must"
     )
 
-# --- 2. the new groups had to be covered without anything on the groups themselves ---------
+# Probe groups must be covered without subscription filters of their own.
 for r in REGIONS:
     pf = logs[r].describe_subscription_filters(logGroupName=PROBE[r])["subscriptionFilters"]
     ck.require(
@@ -268,7 +268,7 @@ for r in REGIONS:
         f"Delivery is graded separately and is not what failed here",
     )
 
-# --- 3. restraints stated in the prompt ---------------------------------------------------
+# Log groups, streams and the relay role must keep their seeded identity and settings.
 for r in REGIONS:
     for g in RELAYED[r] + ([VENDOR] if r == REGION else []):
         cur = present[r].get(g)

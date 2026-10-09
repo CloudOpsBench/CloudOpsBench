@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Teardown for ext_archit_decommission_events: delete every resource the stack created in
-# BOTH regions, regardless of how far the agent got. Idempotent; tolerant of already-absent
-# resources. Also sweeps by prefix as a belt-and-suspenders, then removes ./seed_state.json.
+# Deletes every resource the setup created in both regions, then sweeps by
+# prefix in case any identifiers changed, and removes seed_state.json.
+# Tolerates resources that are already gone.
 set -uo pipefail
 PARAMS="seed_state.json"
-echo "==> teardown ext_archit_decommission_events"
+echo "==> teardown decommission-event-driven-workload"
 [[ -f "$PARAMS" ]] || { echo "no seed_state.json"; exit 0; }
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text 2>/dev/null)}"
 get() { python3 -c "import json;d=json.load(open('$PARAMS'));print(d$1)" 2>/dev/null || true; }
@@ -12,17 +12,17 @@ get() { python3 -c "import json;d=json.load(open('$PARAMS'));print(d$1)" 2>/dev/
 PRIMARY="$(get "['primary_region']")"; SECONDARY="$(get "['secondary_region']")"
 PREFIX="$(get "['prefix']")"
 
-# precise deletes by params
+# Delete the resources recorded in seed_state.json.
 aws events delete-rule --name "$(get "['home']['rule']")" --region "$PRIMARY" >/dev/null 2>&1 || true
 aws sqs delete-queue --queue-url "$(get "['home']['queue_url']")" --region "$PRIMARY" >/dev/null 2>&1 || true
 aws sns delete-topic --topic-arn "arn:aws:sns:${PRIMARY}:${ACCOUNT_ID}:$(get "['home']['topic']")" --region "$PRIMARY" >/dev/null 2>&1 || true
 aws events delete-rule --name "$(get "['away']['rule']")" --region "$SECONDARY" >/dev/null 2>&1 || true
 aws sqs delete-queue --queue-url "$(get "['away']['queue_url']")" --region "$SECONDARY" >/dev/null 2>&1 || true
 
-# belt-and-suspenders prefix sweep across both regions (in case ids drifted)
+# Prefix sweep across both regions.
 for region in "$PRIMARY" "$SECONDARY"; do
   for name in $(aws events list-rules --name-prefix "$PREFIX" --region "$region" --query "Rules[?contains(Name,'${PREFIX}')].Name" --output text 2>/dev/null); do
-    # bare rules have no targets; remove any just in case before delete
+    # Remove any targets before deleting the rule.
     ids=$(aws events list-targets-by-rule --rule "$name" --region "$region" --query 'Targets[].Id' --output text 2>/dev/null)
     [[ -n "$ids" ]] && aws events remove-targets --rule "$name" --ids $ids --region "$region" >/dev/null 2>&1 || true
     aws events delete-rule --name "$name" --region "$region" >/dev/null 2>&1 || true

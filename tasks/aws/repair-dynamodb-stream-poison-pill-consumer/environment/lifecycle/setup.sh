@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Creates a DynamoDB source table with a stream, processed and receipt tables, a
+# failure-archive bucket and a Lambda stream consumer whose handler mishandles
+# poison and REMOVE records. Records resource identifiers and hashes of the
+# protected configuration in seed_state.json.
 set -euo pipefail
 export AWS_PAGER=""
 
@@ -185,7 +189,7 @@ with zipfile.ZipFile('/tmp/ddb-poison-function.zip','w',zipfile.ZIP_DEFLATED) as
         z.write(path,name)
 PY
 
-# IAM role propagation is normally quick; retry function creation without introducing long sleeps.
+# Retry while the new IAM role propagates.
 for i in $(seq 1 20); do
   if aws lambda create-function \
       --function-name "$FUNCTION_NAME" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Teardown — only ever touches the pilot's own Project=vera2 / vera2- resources.
+# Removes the Recycle Bin rules, images, snapshots and volumes tagged Project=vera2.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

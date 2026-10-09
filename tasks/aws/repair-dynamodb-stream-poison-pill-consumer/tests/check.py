@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Check the repaired DynamoDB stream consumer.
+
+Passes when the protected resources and configuration match seed_state.json, the existing
+event-source mapping reports partial batch failures, bisects on error, retries twice, caps
+record age at 3600 seconds and sends failures to the archive bucket, and direct invocations
+handle poison records, replays, deletes, conflicts and transaction groups correctly.
+"""
 import concurrent.futures, hashlib, io, json, os, secrets, subprocess, sys, tempfile, time, urllib.request, uuid, zipfile
 
 
@@ -72,7 +79,7 @@ if not os.path.exists("seed_state.json"):
     fail("seed_state.json is missing")
 S=json.load(open("seed_state.json"))
 
-# ----- Protected resources/configuration -----
+# Protected resources and configuration.
 src=aws_json(["dynamodb","describe-table","--table-name",S["source_table"]])["Table"]
 if src.get("TableArn") != S["source_table_arn"] or src.get("TableId") != S["source_table_id"]:
     fail("source DynamoDB table identity changed")
@@ -159,7 +166,7 @@ objects.sort(key=lambda x:x["Key"])
 if h(objects) != S["archive_objects_sha256"]:
     fail("failure-archive object set changed; do not generate synthetic archived failures during repair testing")
 
-# ----- Event-source mapping semantics -----
+# Event-source mapping settings.
 all_maps=aws_json(["lambda","list-event-source-mappings","--function-name",S["function_name"]]).get("EventSourceMappings",[])
 if len(all_maps) != 1:
     fail(f"expected exactly one preserved event-source mapping for function, found {len(all_maps)}")
@@ -388,7 +395,7 @@ def canonical_deleted(item,event_id,revision,seq):
         fail(f"deleted state for {event_id} is not exact tombstone shape: expected {expected}, got {item}")
 
 
-# Healthy non-stream compatibility contract must survive the stream repair and package rewrite.
+# The compat-v1 invocation path must still return the same result after the repair.
 compat_id=f"compat-{uuid.uuid4().hex[:12]}"
 compat_values=[{"k":"b","v":2},{"k":"a","v":[3,1]},f"x-{secrets.token_hex(4)}"]
 try:
@@ -416,7 +423,7 @@ other=f"grader-{tag}-other"
 poison_only=f"grader-{tag}-poison-only"
 for x in (entity,other,poison_only): delete_item(x)
 
-# 0) Recover artifacts already left by the broken implementation.
+# Recover artifacts left by the broken handler.
 marker_good=f"grader-{tag}-marker-good"
 marker_bad=f"grader-{tag}-marker-poison"
 delete_item(marker_good); delete_item(marker_bad)
@@ -442,7 +449,7 @@ old_poison=rec_upsert(marker_late,"bad5",5,True,seq(42),name="MODIFY",old=("good
 rm4=invoke([old_poison]); expect_failures(rm4,seq(42))
 canonical_live(get_item(marker_late),marker_late,"good6",6,seq(43))
 
-# 1) Revision progress continues around poison; poison remains failed.
+# Revision progress continues around poison; poison remains failed.
 batch1=[
     rec_upsert(entity,"v1",1,False,seq(1),name="INSERT"),
     rec_upsert(entity,"v2-bad",2,True,seq(2),old=("v1",1,False)),
@@ -468,20 +475,20 @@ expect_failures(r2,seq(2),seq(4))
 if get_item(entity) != before_entity or get_item(other) != before_other or get_item(poison_only) is not None:
     fail("checkpoint replay changed materialized state")
 
-# 2) Equal live order with different content/sequence is a conflict.
+# Equal live order with different content/sequence is a conflict.
 same_live=rec_upsert(entity,"v3-CONFLICT",3,False,seq(6),old=("v2-bad",2,True))
 r3=invoke([same_live])
 expect_failures(r3,seq(6))
 canonical_live(get_item(entity),entity,"v3",3,seq(3))
 
-# 3) Critical operation-order case: REMOVE of the *same* revision outranks live revision 3.
+# REMOVE at the same revision outranks live revision 3.
 remove3=rec_remove(entity,"v3",3,seq(7))
 r4=invoke([remove3])
 expect_failures(r4)
 canonical_deleted(get_item(entity),entity,3,seq(7))
 expect_receipt(entity,"delete",3,seq(7))
 
-# Replaying lower-order live rev3 after tombstone is stale success, not resurrection/conflict.
+# Replaying the lower-order live revision 3 after the tombstone is a stale success, not a resurrection or conflict.
 r4b=invoke([rec_upsert(entity,"v3",3,False,seq(3),name="MODIFY",old=("v2-bad",2,True))])
 expect_failures(r4b)
 canonical_deleted(get_item(entity),entity,3,seq(7))
@@ -502,7 +509,7 @@ rev4=rec_upsert(entity,"v4-recreated",4,False,seq(9),name="INSERT")
 r5=invoke([rev4]); expect_failures(r5)
 canonical_live(get_item(entity),entity,"v4-recreated",4,seq(9))
 
-# 4) Poison and intrinsic conflicts are permanent failures even after later state advances.
+# Poison and intrinsic conflicts are permanent failures even after later state advances.
 poison5=rec_upsert(entity,"v5-poison",5,True,seq(10),name="MODIFY",old=("v4-recreated",4,False))
 rev6=rec_upsert(entity,"v6",6,False,seq(11),name="MODIFY",old=("v5-poison",5,True))
 intrinsic=rec_upsert(entity,"v6-conflict",6,False,seq(12),name="MODIFY",old=("v6",6,False))
@@ -514,7 +521,7 @@ r6b=invoke([poison5,intrinsic])
 expect_failures(r6b,seq(10),seq(12))
 canonical_live(get_item(entity),entity,"v7",7,seq(13))
 
-# 5) Structural integrity: mismatched Keys/image, unsupported operation, and malformed MODIFY.
+# Structural integrity: mismatched Keys/image, unsupported operation, and malformed MODIFY.
 key_bad=rec_upsert(entity,"v8-key-bad",8,False,seq(14),name="MODIFY",old=("v7",7,False),key_id=entity+"-other")
 old_id_bad=rec_upsert(entity,"v8-old-bad",8,False,seq(15),name="MODIFY",old=("v7",7,False,entity+"-old"))
 missing_old=rec_upsert(entity,"v8-missing-old",8,False,seq(16),name="MODIFY",old=None)
@@ -529,7 +536,7 @@ del no_seq["dynamodb"]["SequenceNumber"]
 invoke_expect_error([no_seq])
 canonical_live(get_item(entity),entity,"v7",7,seq(13))
 
-# 6) Numeric revisions and same-revision delete precedence in one successful chain.
+# Numeric revisions and same-revision delete precedence in one successful chain.
 newid=f"grader-{tag}-multi"
 delete_item(newid)
 chain=[
@@ -543,7 +550,7 @@ chain=[
 r8=invoke(chain); expect_failures(r8)
 canonical_live(get_item(newid),newid,"m11",11,seq(23))
 
-# 7) Projection/receipt atomicity and legacy partial-pair reconciliation.
+# Projection/receipt atomicity and legacy partial-pair reconciliation.
 partial_state=f"grader-{tag}-partial-state"
 delete_item(partial_state)
 state_seq=seq(50)

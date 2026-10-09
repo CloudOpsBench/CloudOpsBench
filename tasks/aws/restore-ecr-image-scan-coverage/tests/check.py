@@ -1,4 +1,10 @@
-"""Grader for image-scan-coverage-task. Exit 0 = PASS."""
+"""Check that every application repository is scanned on push and its findings are routed.
+
+Passes when no seeded repository was replaced, registry scanning rules in both regions
+cover the application and other-team repositories but not the mirror with scan type BASIC,
+and an enabled EventBridge rule that the SNS topic policy admits forwards every completed
+scan to the security topic.
+"""
 import fnmatch
 import json
 
@@ -18,7 +24,7 @@ events = ck.client("events")
 sns = ck.client("sns")
 ecr_w = ck.client("ecr", region_name=WEST)
 
-# --- 1. every seeded repository still exists, unreplaced ----------------------------------
+# Every seeded repository must still exist and not have been replaced.
 present = {}
 for name, ident in seed["repo_identity"].items():
     cli = ecr_w if ident.get("region") == WEST else ecr
@@ -38,7 +44,7 @@ for name, ident in seed["repo_identity"].items():
                 f"{d.get('encryptionConfiguration')}/{d.get('imageTagMutability')}")
     present[name] = d
 
-# --- 2. automatic on-push scanning coverage ----------------------------------------------
+# Registry scanning coverage.
 cfg = ecr.get_registry_scanning_configuration()["scanningConfiguration"]
 scan_type = cfg.get("scanType")
 rules = cfg.get("rules", [])
@@ -51,12 +57,10 @@ ck.require(
 
 
 def auto_scanned(repo, ruleset=None):
-    """Which registry filters, if any, put this repository on automatic on-push scanning.
+    """Return the registry scanning filters that match this repository.
 
-    A repository is scanned automatically only when a registry scanning rule's filter
-    matches it. A repository matching no filter is left on the manual scan frequency
-    regardless of its own repository-level scanOnPush flag: the two settings are stored
-    independently and never reconcile.
+    Only registry rules are considered; the repository-level scanOnPush flag is stored
+    independently and does not enable automatic scanning.
     """
     hits = []
     for rule in (rules if ruleset is None else ruleset):
@@ -119,7 +123,7 @@ ck.require(
     f"scanned automatically.",
 )
 
-# --- 3. findings from every application repository reach the security topic ---------------
+# Scan events from every application repository must reach the security topic.
 try:
     sns.get_topic_attributes(TopicArn=TOPIC)
 except Exception as exc:  # noqa: BLE001
@@ -161,7 +165,7 @@ def scan_event(repo, severities):
 
 
 def routing_rule(repo):
-    """A rule that forwards EVERY completed scan for this repository, not just noisy ones."""
+    """Return a rule that matches completed scans for this repository, with or without findings."""
     probes = [scan_event(repo, {"HIGH": 1, "MEDIUM": 2}), scan_event(repo, {})]
     for rule in matching_rules:
         if rule.get("State") != "ENABLED" or not rule.get("EventPattern"):
@@ -188,7 +192,7 @@ policy = json.loads(sns.get_topic_attributes(TopicArn=TOPIC)["Attributes"].get("
 
 
 def admits_router(statement):
-    """The grant must admit the rules that actually do the routing, conditions included."""
+    """True if the statement lets the routing rules publish, including aws:SourceArn conditions."""
     if statement.get("Effect") != "Allow":
         return False
     if "events.amazonaws.com" not in ck.as_list(statement.get("Principal", {}).get("Service", [])):

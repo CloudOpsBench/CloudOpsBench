@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Seed the fleet-platform IAM role retirement.
+# Creates the legacy fleet automation role, its replacement, and the resources
+# that run through the legacy role. Identifiers are written to seed_state.json.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 

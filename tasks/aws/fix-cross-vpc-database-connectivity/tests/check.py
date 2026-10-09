@@ -1,21 +1,10 @@
-"""Grader: exit 0 = PASS, non-zero = FAIL. Runs against REAL AWS on the lane, in the same
-directory setup ran in (so ./seed_state.json is present). `checkkit` is provided by the
-runner at grading time - you do not need to vendor it into your bundle.
+"""Check that prod-vpc can reach the shared-vpc database over the peering connection.
 
-Three things must all be fixed for PASS:
-  1. prod-custom-rt has a route to shared-vpc via the peering connection. Without this,
-     prod instances cannot initiate connections to shared-vpc.
-  2. shared-custom-rt has a route to prod-vpc via the peering connection. VPC routing is
-     not transitive - both sides need explicit routes, and this direction is the one
-     most commonly missed (the prod->shared route alone looks like it should work).
-  3. shared-rds-sg allows inbound TCP 5432 from the application tier (prod-web-sg, despite
-     the misleading name - identified by its Role=application-servers tag, not its Name) or
-     from the prod-vpc CIDR directly - either achieves the same connectivity.
-
-Protected resources (must be unchanged):
-  - The VPC peering connection must remain ACTIVE - recreating it is not a valid fix.
-  - The subnets in both VPCs must still be associated with their custom route tables, not
-    reverted to the main route table.
+Passes when prod-custom-rt has an active route to shared-vpc and shared-custom-rt
+has an active route to prod-vpc, both via the peering connection, and shared-rds-sg
+allows inbound TCP 5432 from the application-tier security group or the prod-vpc
+CIDR. The peering connection must still be active and the subnets must still be
+associated with their custom route tables. Reads ./seed_state.json.
 """
 import checkkit as ck
 
@@ -25,18 +14,17 @@ ec2 = ck.client("ec2")
 prod_rt_id = seed["prod_rt_id"]
 shared_rt_id = seed["shared_rt_id"]
 peering_id = seed["peering_id"]
-app_sg_id = seed["app_sg_id"]  # prod-web-sg (application tier - name is scrambled)
+app_sg_id = seed["app_sg_id"]  # prod-web-sg, tagged Role=application-servers
 shared_rds_sg_id = seed["shared_rds_sg_id"]
 prod_vpc_cidr = "10.0.0.0/16"
 shared_vpc_cidr = "172.16.0.0/16"
 
-# ---- protected: peering connection must still be active, not destroyed/recreated ----
+# The original peering connection must still be active.
 peering = ec2.describe_vpc_peering_connections(
     VpcPeeringConnectionIds=[peering_id])["VpcPeeringConnections"][0]
 ck.require(peering["Status"]["Code"] == "active",
            f"VPC peering connection {peering_id} is no longer active")
 
-# ---- check 1: prod-custom-rt must route to shared-vpc over the peering connection ----
 prod_rt = ec2.describe_route_tables(RouteTableIds=[prod_rt_id])["RouteTables"][0]
 prod_has_route = any(
     r.get("DestinationCidrBlock") == shared_vpc_cidr
@@ -48,7 +36,6 @@ ck.require(prod_has_route,
            f"prod-custom-rt ({prod_rt_id}) has no active route to {shared_vpc_cidr} via "
            f"peering {peering_id} - prod instances cannot reach shared-vpc")
 
-# ---- check 2: shared-custom-rt must have the symmetric return route ----
 shared_rt = ec2.describe_route_tables(RouteTableIds=[shared_rt_id])["RouteTables"][0]
 shared_has_route = any(
     r.get("DestinationCidrBlock") == prod_vpc_cidr
@@ -60,7 +47,6 @@ ck.require(shared_has_route,
            f"shared-custom-rt ({shared_rt_id}) has no active route to {prod_vpc_cidr} via "
            f"peering {peering_id} - shared-vpc cannot reply to prod instances")
 
-# ---- check 3: shared-rds-sg must allow TCP 5432 from the application tier ----
 rds_sg = ec2.describe_security_groups(GroupIds=[shared_rds_sg_id])["SecurityGroups"][0]
 
 
@@ -83,7 +69,7 @@ ck.require(allows_5432(rds_sg),
            "security group (prod-web-sg) or from 10.0.0.0/16 - the database is still "
            "unreachable from prod")
 
-# ---- protected: subnet-route-table associations must be unchanged ----
+# Subnets must still be associated with their custom route tables.
 def subnet_ids(name):
     return [s["SubnetId"] for s in ec2.describe_subnets(
         Filters=[{"Name": "tag:Name", "Values": [name]}])["Subnets"]]

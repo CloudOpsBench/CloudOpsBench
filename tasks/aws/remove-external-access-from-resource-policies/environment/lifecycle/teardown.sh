@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the vera2- SNS topics, SQS queues, Kinesis streams and HealthOmics
+# sequence stores.
 set -uo pipefail
 export AWS_PAGER=""
 REGION="${AWS_REGION:-us-east-1}"

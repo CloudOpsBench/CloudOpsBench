@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-# Faithful revision: fully decommission the 'aaq-7c21' analytics stack by DISCOVERING every
-# resource carrying the prefix at runtime (never reads seed_state.json). Sweeps ALL regions and
-# every in-scope service (Athena work-groups, Secrets Manager, SSM, SQS). Same delete calls +
-# params as the golden (Athena RecursiveDeleteOption, Secrets ForceDeleteWithoutRecovery). SQS
-# list_queues is eventually consistent right after create; a naive per-region 240s backoff spins
-# in every empty region (~60min, blows the 8-min cap), so we do one immediate pass everywhere and
-# reserve the bounded backoff for HOME regions (those hosting a strongly-consistent resource).
+# Deletes every Athena work-group, secret, SSM parameter and SQS queue whose name carries
+# the `aaq-7c21` prefix, in all regions. SQS list_queues is eventually consistent after
+# create, so the retry with backoff runs only in regions where another matching resource
+# was found; retrying in every region would exceed the time limit.
 set -euo pipefail
 python3 - <<'PY'
 import time
 import boto3
 from botocore.exceptions import ClientError
 
-PREFIX = "aaq-7c21"  # stated in the prompt: every resource carries this name-prefix
+PREFIX = "aaq-7c21"
 
 regions = [r["RegionName"] for r in boto3.client("ec2", "us-east-1").describe_regions()["Regions"]]
 deleted = 0
@@ -38,11 +35,11 @@ def sqs_sweep(reg):
             print("skip sqs:", reg, u, e.response["Error"].get("Code"))
     return n
 
-# ── Pass 1: strongly-consistent services across ALL regions; note where the stack lives ──
+# Strongly consistent services, across all regions.
 pending_sqs = []   # HOME regions whose eventually-consistent queue wasn't visible yet
 for reg in regions:
     hit = False
-    # Athena work-groups (the niche service)
+    # Athena work-groups
     try:
         ath = boto3.client("athena", region_name=reg)
         tok = None
@@ -104,7 +101,7 @@ for reg in regions:
     if hit and got == 0:
         pending_sqs.append(reg)
 
-# ── Pass 2: SQS eventual consistency — bounded backoff ONLY in home regions still missing it ──
+# SQS is eventually consistent: retry with backoff in home regions still missing the queue.
 for reg in dict.fromkeys(pending_sqs):
     deadline, delay = time.time() + 180, 3
     while time.time() < deadline:

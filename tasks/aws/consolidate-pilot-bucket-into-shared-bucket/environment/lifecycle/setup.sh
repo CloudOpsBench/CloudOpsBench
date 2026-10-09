@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates a pilot bucket holding two objects and one in-progress multipart upload,
+# and a shared bucket holding one existing object. Bucket names and payload hashes
+# are recorded in seed_state.json for the checker.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="$(date +%s)-${RANDOM}-${RANDOM}"

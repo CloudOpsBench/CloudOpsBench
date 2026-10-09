@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
+# Creates a vera2- AMI (from a 1 GiB volume snapshot) and a vera2- SageMaker image
+# with its IAM role, and records their identifiers in seed_state.json.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="$(date +%s | tail -c 5)${RANDOM}"
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 
-# 1) The obvious image: an AMI. `ec2 describe-images` returns it. Positive control.
+# AMI registered from a snapshot of an empty volume.
 VOL=$(aws ec2 create-volume --region "$REGION" --availability-zone "${REGION}a" --size 1 --volume-type gp3 \
   --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=vera2-${SUF}-vol}]" \
   --query VolumeId --output text)

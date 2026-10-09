@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes every SSM parameter under /vera2/.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 for P in $(aws ssm get-parameters-by-path --path /vera2/ --recursive --region "$REGION" \

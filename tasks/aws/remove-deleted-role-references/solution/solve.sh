@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the inline policy that names the retired role and disassociates the
+# account's Greengrass service role when it still points at that role.
 set -uo pipefail
 export AWS_PAGER=""
 export AWS_DEFAULT_REGION="${AWS_REGION:-us-east-1}"

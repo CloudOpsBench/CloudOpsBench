@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# solution.sh — reference solution. Discovers everything at runtime;
-# never reads seed_state.json.
+# Adds kms:Decrypt scoped to the data bucket's key to both the app role's
+# identity policy and its permissions boundary. Resources are discovered at
+# runtime rather than read from seed_state.json.
 set -euo pipefail
 
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 
-# 1. Discover the app role
 APP_ROLE="$(aws iam list-roles --query 'Roles[?starts_with(RoleName, `ciph-app-`)].RoleName' --output text | head -n1)"
 echo "App role: ${APP_ROLE}"
 
-# 2. Discover the data bucket and its KMS key from the bucket encryption config.
-#    The data bucket is the ciph-* bucket whose default encryption is aws:kms.
+# The data bucket is the ciph-* bucket whose default encryption is aws:kms.
 DATA_BUCKET=""
 KEY_ARN=""
 for BUCKET in $(aws s3api list-buckets --query 'Buckets[].Name' --output text); do
@@ -36,7 +35,7 @@ case "${KEY_ARN}" in
   *) KEY_ARN="$(aws kms describe-key --key-id "${KEY_ARN}" --query 'KeyMetadata.Arn' --output text)" ;;
 esac
 
-# 3. Cause A — identity policy: add kms:Decrypt scoped to the specific key.
+# Identity policy: allow kms:Decrypt on the specific key.
 cat > /tmp/kms-identity.json <<EOF
 {
   "Version": "2012-10-17",
@@ -54,9 +53,8 @@ aws iam put-role-policy --role-name "${APP_ROLE}" --policy-name "kms-decrypt-dat
   --policy-document file:///tmp/kms-identity.json
 echo "Identity policy: added kms:Decrypt scoped to the data key."
 
-# 4. Cause B — permissions boundary: effective permissions are the INTERSECTION
-#    of identity policy and boundary. The boundary allows only S3, so extend it
-#    minimally with the same scoped kms:Decrypt, keeping everything else as-is.
+# Effective permissions are the intersection of the identity policy and the
+# boundary, so the boundary gets the same scoped kms:Decrypt statement.
 BOUNDARY_ARN="$(aws iam get-role --role-name "${APP_ROLE}" \
   --query 'Role.PermissionsBoundary.PermissionsBoundaryArn' --output text)"
 echo "Boundary: ${BOUNDARY_ARN}"

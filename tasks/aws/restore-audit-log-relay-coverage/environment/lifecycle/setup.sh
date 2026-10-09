@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates Kinesis audit streams in two regions, a relay role, and /svc/ log groups
+# of which only some have subscription filters to the audit stream. The seeded
+# state is recorded in seed_state.json for the checker.
 set -euo pipefail
 # Log group names start with "/"; keep Git Bash from rewriting them as Windows paths.
 export MSYS_NO_PATHCONV=1
@@ -7,7 +10,7 @@ REGION="${AWS_REGION:-us-east-1}"
 WEST="us-west-2"
 ACCT="$(aws sts get-caller-identity --query Account --output text)"
 
-# --- clean residue from an earlier run in this account -------------------------------------
+# Remove leftovers from an earlier run.
 for r in "$REGION" "$WEST"; do
   for p in $(aws logs describe-account-policies --policy-type SUBSCRIPTION_FILTER_POLICY \
                --region "$r" --query 'accountPolicies[].policyName' --output text 2>/dev/null); do
@@ -43,7 +46,7 @@ G_PRICING="/svc/pricing-engine-${SUF}"
 G_VENDOR="/svc/vendor-callback-raw-${SUF}"
 G_EDGE="/svc/edge-cache-${SUF}"
 
-# --- destination streams -------------------------------------------------------------------
+# Destination streams.
 aws kinesis create-stream --stream-name "$STREAM" --shard-count 1 --region "$REGION" >/dev/null
 aws kinesis create-stream --stream-name "$ARCHIVE" --shard-count 1 --region "$REGION" >/dev/null
 aws kinesis create-stream --stream-name "$WSTREAM" --shard-count 1 --region "$WEST" >/dev/null
@@ -57,7 +60,7 @@ ARCHIVE_ARN="$(aws kinesis describe-stream --stream-name "$ARCHIVE" --region "$R
 WSTREAM_ARN="$(aws kinesis describe-stream --stream-name "$WSTREAM" --region "$WEST" \
   --query 'StreamDescription.StreamARN' --output text)"
 
-# --- the relay role CloudWatch Logs writes through -----------------------------------------
+# Role that CloudWatch Logs assumes to write to the streams.
 aws iam create-role --role-name "$ROLE" --assume-role-policy-document \
   '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"logs.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
 python3 - "$ROLE" "$STREAM_ARN" "$ARCHIVE_ARN" "$WSTREAM_ARN" <<'PY'
@@ -73,7 +76,7 @@ boto3.client("iam").put_role_policy(
 PY
 ROLE_ARN="$(aws iam get-role --role-name "$ROLE" --query 'Role.Arn' --output text)"
 
-# --- application log groups ----------------------------------------------------------------
+# Application log groups.
 create_group() {  # name, class, retention, region
   aws logs create-log-group --log-group-name "$1" --log-group-class "$2" --region "$4" >/dev/null
   aws logs put-retention-policy --log-group-name "$1" --retention-in-days "$3" --region "$4" >/dev/null

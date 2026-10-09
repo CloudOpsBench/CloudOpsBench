@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Aborts multipart uploads, empties and deletes the two buckets recorded in
+# seed_state.json.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

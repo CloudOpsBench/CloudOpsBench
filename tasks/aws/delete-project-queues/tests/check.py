@@ -1,11 +1,7 @@
-"""Grader: exit 0 = PASS.
+"""Check that every vera2 queue is gone from both SQS and MediaConvert.
 
-Every vera2 queue must be gone. A queue cleanup that only runs `sqs list-queues` misses AWS Elemental
-MediaConvert queues: a MediaConvert queue is a queue too, but it is enumerated by `mediaconvert list-queues`
-(against the account-specific endpoint), never by `sqs list-queues`. The MediaConvert check is the golden-
-critical, strongly-consistent gate and is evaluated first. SQS `list-queues` is eventually consistent on
-delete, so a correctly-deleted decoy can linger briefly; the SQS positive-control is therefore polled with a
-bounded wait (only on the otherwise-passing path).
+Passes when `mediaconvert list-queues` and `sqs list-queues` return no vera2- queues.
+SQS list-queues is eventually consistent after a delete, so that check is polled.
 """
 import time
 import boto3
@@ -19,7 +15,7 @@ mc = boto3.client("mediaconvert", region_name=R)
 mc = boto3.client("mediaconvert", region_name=R, endpoint_url=mc.describe_endpoints()["Endpoints"][0]["Url"])
 
 
-def cop2_mediaconvert():
+def list_mediaconvert_queues():
     out, nxt = [], None
     while True:
         resp = mc.list_queues(NextToken=nxt) if nxt else mc.list_queues()
@@ -29,12 +25,12 @@ def cop2_mediaconvert():
             return out
 
 
-def cop2_sqs():
+def list_sqs_queues():
     return [u.split("/")[-1] for u in (sqs.list_queues(QueueNamePrefix="vera2-").get("QueueUrls") or [])]
 
 
-# MediaConvert = golden-critical, strongly consistent → evaluate first, fail fast.
-mc_left = cop2_mediaconvert()
+# MediaConvert listing is strongly consistent, so it is checked first.
+mc_left = list_mediaconvert_queues()
 ck.require(
     not mc_left,
     "Some vera2 queues still exist. A complete queue cleanup must cover every service that provides queues, "
@@ -42,13 +38,13 @@ ck.require(
     "`sqs list-queues`). Still present: %s" % ", ".join("MediaConvert queue " + n for n in mc_left),
 )
 
-# SQS positive-control (tolerate eventual-consistency delete lag with a bounded poll).
-sqs_left = cop2_sqs()
+# SQS list-queues can lag after a delete; poll for up to a minute.
+sqs_left = list_sqs_queues()
 for _ in range(12):
     if not sqs_left:
         break
     time.sleep(5)
-    sqs_left = cop2_sqs()
+    sqs_left = list_sqs_queues()
 ck.require(not sqs_left, "Some vera2 SQS queues still exist: %s" % ", ".join(sqs_left))
 
 ck.ok("no vera2 queues remain (SQS and MediaConvert both checked)")

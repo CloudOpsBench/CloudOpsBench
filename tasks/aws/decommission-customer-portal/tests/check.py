@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Grader (state-based, route-agnostic, deterministic).
+"""Check that the customer portal is fully removed and the billing workload is intact.
 
-The shutdown is complete when nothing belonging to the portal survives on any plane, including the
-Well-Architected plane where a review can outlive the system it reviews, while every one of the billing
-workload's own resources is still in place. Conditions are reported separately so a partial sweep is
-legible, and how anything was removed does not matter. SQS removes a queue asynchronously and keeps
-listing it briefly, so a deletion in flight is given time to land.
+Passes when the portal's SQS queue, SNS topic and log group are gone, no Well-Architected
+workload references the portal's suffix, and the billing workload's queue, topic, log
+group and Well-Architected review still exist. SQS keeps listing a deleted queue for a
+short time, so the queue check polls for up to 90 seconds.
 """
 import json
 import time

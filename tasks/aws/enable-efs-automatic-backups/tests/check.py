@@ -1,5 +1,8 @@
-"""Grader: exit 0 = PASS. Automatic backups must be enabled on every vera2 EFS file system. File systems
-live in more than one region -> enumerate across regions."""
+"""Check that automatic backups are enabled on every vera2 EFS file system.
+
+Passes when each seeded file system, in every seeded region, has a backup policy
+status of ENABLED or ENABLING.
+"""
 import boto3
 import checkkit as ck
 seed = ck.seed(); missing = []

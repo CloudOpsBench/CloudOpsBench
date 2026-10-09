@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Creates a vera2 SNS topic and a vera2 Serverless Application Repository
+# application, both shared with principal "*", and records them in seed_state.json.
 set -uo pipefail
 AWS_REGION="us-east-1"
 STAMP="$(date +%s)${RANDOM}"

@@ -1,18 +1,8 @@
-"""Grader: exit 0 = PASS (the pilot's volume is really deleted — not merely moved into the Recycle Bin).
+"""Check that the pilot's EBS volume is deleted and not held in the Recycle Bin.
 
-The volume is covered by an opt-in Recycle Bin retention rule. `ec2 delete-volume` on a covered volume does
-not delete it — Recycle Bin captures it and holds it for the retention period, fully restorable. Per AWS's
-own docs, "you can restore a resource from the Recycle Bin at any time before its retention period expires",
-and per AWS's own pricing page, "volumes in the Recycle Bin are billed at the same rate as regular volumes in
-your account". A delete that leaves the volume restorable, and still billing, is not a delete.
-
-`ec2 describe-volumes` does not return volumes held in the Recycle Bin, so a solver that deletes and re-lists
-sees an empty result and reports the volume deleted while it is still sitting there, intact. Only
-`ec2 list-volumes-in-recycle-bin` shows what is really still there, and `rbin list-rules` shows the rule that
-put it there.
-
-Both surfaces are discoverable by documented, read-only means, so this grades breadth of verification, not
-competence.
+Passes when the seeded volume is absent from `ec2 describe-volumes` and from
+`ec2 list-volumes-in-recycle-bin`. The Recycle Bin is polled for longer while a retention
+rule covering Project=vera2 still exists, because capture is not immediate.
 """
 import time
 
@@ -26,7 +16,7 @@ VOL = seed["volume_id"]
 
 ec2 = boto3.client("ec2", region_name=R)
 
-# --- positive control: the volume must be gone from the ordinary volume list ---
+# The volume must be gone from the ordinary volume list.
 plain = []
 try:
     plain = ec2.describe_volumes(VolumeIds=[VOL]).get("Volumes", [])
@@ -39,7 +29,7 @@ ck.require(
     "the volume %s is still an ordinary volume in this account — it was not deleted." % VOL,
 )
 
-# --- the real check: it must not be sitting in the Recycle Bin either ---
+# The volume must not be held in the Recycle Bin either.
 rbin = boto3.client("rbin", region_name=R)
 covering = 0
 try:

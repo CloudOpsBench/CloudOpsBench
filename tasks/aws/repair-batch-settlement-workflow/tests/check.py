@@ -1,3 +1,10 @@
+"""Check that the batch-settlement workflow computes invoices correctly via both aliases.
+
+Passes when the `live` and `audit` aliases each route 100% to distinct versions other
+than the seeded one, both versions keep the original role, JSONata and the two Pass
+states with no Resource, and executions through each alias match the reference
+computation for crafted and randomized batches.
+"""
 import json
 import math
 import random

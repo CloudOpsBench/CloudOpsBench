@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates an SQS queue, SNS topic, log group and Well-Architected workload review
+# for a customer portal and for a billing workload, and records them in
+# seed_state.json.
 set -euo pipefail
 
 python3 - <<'PY'

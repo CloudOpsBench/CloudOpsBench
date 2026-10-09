@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Writes the new endpoint to the checkout db-endpoint parameter and moves the
+# release-current label to the new version.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 NEW="aurora-pg.vera2.internal"

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates prod-vpc and shared-vpc with an active peering connection, custom route
+# tables without cross-VPC routes, and security groups without a 5432 ingress rule.
+# Resource identifiers are written to seed_state.json.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

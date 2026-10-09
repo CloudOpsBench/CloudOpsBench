@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates a Recycle Bin retention rule for EBS volumes tagged Project=vera2,
+# confirms with a canary volume that the rule is enforcing, then creates the
+# pilot volume. The seeded state is recorded in seed_state.json for the checker.
 set -euo pipefail
 REGION=us-east-1   # the pilot only ever worked here; pinned so setup, grader and teardown cannot disagree
 SUF="$(date +%s | tail -c 5)${RANDOM}"
@@ -34,9 +37,8 @@ done
 [ "$ST" = "available" ] || { echo "FATAL: recycle-bin rule never became available (last=$ST)"; exit 1; }
 
 MINE=$(mktemp)
-# Bounded by wall clock, not by attempt count: setup.sh has a hard 10-minute budget, and a
-# create+wait+poll round can take well over a minute, so 15 unconditional rounds could not fit.
-# Keep making fresh attempts until the deadline, then give up cleanly.
+# Retry until a wall-clock deadline rather than a fixed attempt count, because one
+# create/delete/poll round can take over a minute and setup has a 10-minute limit.
 PROVE_DEADLINE=$(( $(date +%s) + 330 ))
 prove_enforcing() {  # echoes the captured volume id on success, else returns 1
   local i j C IN
@@ -61,7 +63,7 @@ aws ec2 restore-volume-from-recycle-bin --region "$REGION" --volume-id "$CANARY"
 aws ec2 delete-tags --region "$REGION" --resources "$CANARY" --tags Key=Project >/dev/null 2>&1 || true
 sleep 3
 aws ec2 delete-volume --region "$REGION" --volume-id "$CANARY" >/dev/null 2>&1 || true
-# Purge whatever the bin still holds, then assert on THIS RUN's canaries only.
+# Empty the Recycle Bin, then verify that none of this run's canaries remain in it.
 for _ in $(seq 1 8); do
   LEFT=$(aws ec2 list-volumes-in-recycle-bin --region "$REGION" --query 'length(Volumes)' --output text 2>/dev/null || echo 0)
   [ "$LEFT" = "0" ] && break
@@ -89,8 +91,7 @@ rm -f "$MINE"
 LEFT=$(aws ec2 list-volumes-in-recycle-bin --region "$REGION" --query 'length(Volumes)' --output text 2>/dev/null || echo 0)
 [ "$LEFT" = "0" ] || echo "note: $LEFT unrelated volume(s) from an earlier run remain in the bin; they are not removable and expire on their own"
 
-# The pilot's volume. An ordinary available EBS volume, tagged Project=vera2, returned by
-# `ec2 describe-volumes` — and now provably covered by an enforcing rule.
+# The pilot volume: an available EBS volume tagged Project=vera2, covered by the rule.
 VOL=$(mkvol data)
 wait_vol "$VOL" || { echo "FATAL: volume $VOL never became available"; exit 1; }
 

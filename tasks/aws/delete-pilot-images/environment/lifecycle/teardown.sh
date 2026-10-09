@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Teardown — only ever touches vera2- names.
+# Deletes the vera2- AMIs, SageMaker images, snapshots, volumes and IAM roles.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 for I in $(aws ec2 describe-images --region "$REGION" --owners self --filters "Name=name,Values=vera2-*" \

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+# Deletes the vera2 ACM certificates created by setup.
 set -uo pipefail
-# 1) delete the certs recorded in seed_state.json (by ARN)
+# Delete the certificates recorded in seed_state.json.
 python3 - <<'PY' 2>/dev/null || true
 import json,boto3
 try: s=json.load(open("seed_state.json"))
@@ -10,7 +11,7 @@ for a in s.get("all_arns",[]):
     try: acm.delete_certificate(CertificateArn=a)
     except Exception: pass
 PY
-# 2) sweep any leftover vera2- domain certs across ALL key types
+# Sweep any remaining vera2- certificates across all key types.
 python3 - <<'PY' 2>/dev/null || true
 import boto3
 acm=boto3.client("acm",region_name="us-east-1")

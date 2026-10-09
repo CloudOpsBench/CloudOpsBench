@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Seeds a retired and a replacement telemetry archive bucket, plus the writers that
+# deliver into the retired one: S3 replication in two regions, a Firehose stream, a
+# DataSync task, a VPC flow log, S3 access logging and an Athena workgroup. The
+# seeded state is recorded in seed_state.json for the checker.
 set -euo pipefail
 python3 - <<'PY'
 import boto3, json, os, time, uuid
@@ -23,7 +27,7 @@ DS_ROLE = "telemetry-archive-datasync-role"
 
 
 def purge():
-    """Remove leftovers from an earlier run. The lane nukes state; a dev account does not."""
+    """Remove leftovers from an earlier run."""
     try:
         for name in fh.list_delivery_streams(Limit=100)["DeliveryStreamNames"]:
             if name == "telemetry-raw-stream":
@@ -139,7 +143,7 @@ for k in LEGACY_KEYS:
 
 time.sleep(12)  # IAM propagation before S3/DataSync/Firehose validate the roles
 
-# --- writer 1: replication on the in-region ingest bucket -------------------------------
+# replication on the in-region ingest bucket
 INGEST_REPL = {
     "Role": repl_arn,
     "Rules": [
@@ -170,7 +174,7 @@ time.sleep(10)
 
 s3.put_bucket_replication(Bucket=INGEST, ReplicationConfiguration=INGEST_REPL)
 
-# --- writer 2: replication on the ingest bucket in the other region ---------------------
+# replication on the ingest bucket in the other region
 EDGE_REPL = {
     "Role": repl_arn,
     "Rules": [
@@ -187,7 +191,7 @@ EDGE_REPL = {
 }
 s3e.put_bucket_replication(Bucket=EDGE_INGEST, ReplicationConfiguration=EDGE_REPL)
 
-# --- writer 3: the raw telemetry delivery stream ----------------------------------------
+# the raw telemetry delivery stream
 fh.create_delivery_stream(
     DeliveryStreamName="telemetry-raw-stream",
     DeliveryStreamType="DirectPut",
@@ -199,7 +203,7 @@ fh.create_delivery_stream(
         "CompressionFormat": "UNCOMPRESSED",
     })
 
-# --- writer 4: the nightly partner sync -------------------------------------------------
+# the nightly partner sync
 SCHEDULE = "cron(0 3 * * ? *)"
 EXCLUDES = [{"FilterType": "SIMPLE_PATTERN", "Value": "/staging/*|*.partial"}]
 
@@ -222,7 +226,7 @@ partner_task = ds.create_task(
     Name="partner-drop-nightly", Schedule={"ScheduleExpression": SCHEDULE},
     Excludes=EXCLUDES)["TaskArn"]
 
-# --- already cut over, and not part of the work: leave alone ----------------------------
+# already cut over, and not part of the work: leave alone
 an_src = location(ds, INGEST, "/analytics/")
 an_dst = location(ds, NEW, "/analytics/")
 analytics_task = ds.create_task(
@@ -230,7 +234,7 @@ analytics_task = ds.create_task(
     Name="analytics-export-daily", Schedule={"ScheduleExpression": "cron(0 5 * * ? *)"},
     Excludes=[{"FilterType": "SIMPLE_PATTERN", "Value": "*.tmp"}])["TaskArn"]
 
-# --- writer 5: a flow log in the other region, writing straight into the retired bucket --
+# a flow log in the other region, writing straight into the retired bucket
 ec2e = boto3.client("ec2", region_name=EDGE)
 vpc = ec2e.create_vpc(CidrBlock="10.77.0.0/16")["Vpc"]["VpcId"]
 ec2e.create_tags(Resources=[vpc], Tags=[
@@ -259,7 +263,7 @@ for page in s3.get_paginator("list_object_versions").paginate(
     if objs:
         s3.delete_objects(Bucket=LEGACY, Delete={"Objects": objs})
 
-# --- writer 7: an ad-hoc query workgroup parking its results in the retired bucket -------
+# an ad-hoc query workgroup parking its results in the retired bucket
 ath = boto3.client("athena", region_name=EDGE)
 ATHENA_WG = "telemetry-adhoc"
 ATHENA_PREFIX = "athena-results/"
@@ -273,12 +277,12 @@ ath.create_work_group(
     Configuration={"ResultConfiguration": {
         "OutputLocation": "s3://%s/%s" % (LEGACY, ATHENA_PREFIX)}})
 
-# --- writer 6: server access logging on the ingest bucket -------------------------------
+# server access logging on the ingest bucket
 ACCESS_PREFIX = "access-logs/"
 s3.put_bucket_logging(Bucket=INGEST, BucketLoggingStatus={"LoggingEnabled": {
     "TargetBucket": LEGACY, "TargetPrefix": ACCESS_PREFIX}})
 
-# --- the completion evidence ------------------------------------------------------------
+# the completion evidence
 ssm.put_parameter(
     Name="/platform/telemetry/archive-cutover", Overwrite=True, Type="String",
     Value=json.dumps({

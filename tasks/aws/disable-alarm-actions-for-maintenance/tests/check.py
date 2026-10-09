@@ -1,8 +1,7 @@
-"""Grader: exit 0 = PASS.
+"""Check that alarm actions are disabled on every seeded vera2 alarm.
 
-Alarm actions must be disabled on ALL vera2 alarms. `aws cloudwatch describe-alarms` returns only metric
-alarms by default — composite alarms are omitted unless you pass --alarm-types (e.g. "CompositeAlarm").
-A correct solution disables actions on every vera2 alarm, metric AND composite.
+Passes when ActionsEnabled is false on all seeded metric and composite alarms. Both
+AlarmTypes are requested because describe_alarms returns only metric alarms by default.
 """
 import boto3
 import checkkit as ck

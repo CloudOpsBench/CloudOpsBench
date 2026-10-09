@@ -1,10 +1,9 @@
-"""Grader.
+"""Check that every meter exporter delivers to the analytics table's S3 location.
 
-Outcome first: the Lambda exporter is INVOKED through its live alias and the delivery stream
-it actually writes to is resolved to an S3 location, before anything structural is read. Then
-the two exporters that cannot be invoked are read, then the protected resources. No fix shape
-is graded - any delivery stream that lands at the catalog table's location counts, including
-one the agent created.
+Passes when the Lambda exporter (invoked through its live alias), the Batch job
+definition, the Glue job and the CodeBuild project in the secondary region each
+name a delivery stream whose destination is the table location, that stream can
+write there, and the seeded streams and the catalog table are unchanged.
 """
 import json
 import time
@@ -32,9 +31,7 @@ TARGET = seed["table_snapshot"]["StorageDescriptor"]["Location"].rstrip("/")
 
 
 def dest_uri(stream):
-    """The s3://bucket/prefix a delivery stream lands at, or None if there is no such
-    stream (which is also what a value naming something that is not a delivery stream
-    resolves to)."""
+    """Return the s3://bucket/prefix a delivery stream delivers to, or None if no such stream exists."""
     if not stream:
         return None
     try:
@@ -68,7 +65,7 @@ def alias_env():
     return (cfg.get("Environment") or {}).get("Variables", {}).get(SETTING)
 
 
-# ---------------------------------------------------------------- 1. functional, runs first
+# Invoke the Lambda exporter through its live alias.
 marker = uuid.uuid4().hex[:12]
 served = None
 delivered = False
@@ -120,7 +117,7 @@ ck.require(
     "under its live alias."
     % (invoke_note, DB, TABLE, TARGET, where(served), latest_env(), FN, ALIAS))
 
-# ---------------------------------------------------------------- 2. the Batch job definition
+# Batch job definition.
 jds = batch.describe_job_definitions(
     jobDefinitionName=JOBDEF, status="ACTIVE").get("jobDefinitions", [])
 ck.require(
@@ -143,7 +140,7 @@ ck.require(
     "scope." % (latest_jd["revision"], JOBDEF, SETTING, where(jd_stream), DB, TABLE, TARGET,
                 JOBDEF, SETTING))
 
-# ---------------------------------------------------------------- 3. the Glue job
+# Glue job.
 job = glue.get_job(JobName=GLUEJOB)["Job"]
 args = dict(job.get("DefaultArguments") or {})
 args.update(job.get("NonOverridableArguments") or {})  # non-overridable wins at run time
@@ -156,7 +153,7 @@ ck.require(
     "instruction.md puts every exporter carrying %s in scope."
     % (GLUEJOB, SETTING, where(glue_stream), DB, TABLE, TARGET, GLUEJOB, SETTING))
 
-# ------------------------------------------- 4. the exporter in the other region
+# CodeBuild exporter in the secondary region.
 cb = ck.client("codebuild", region_name=SECONDARY)
 projects = cb.batch_get_projects(names=[CBPROJECT]).get("projects", [])
 ck.require(
@@ -179,22 +176,21 @@ ck.require(
     % (CBPROJECT, SECONDARY, SETTING, where(cb_stream), DB, TABLE, TARGET, seed["region"],
        SECONDARY, SETTING))
 
-# ------------------------------------------- 4. the stream can actually write that location
+# The delivery stream's role must be able to write to the table location.
 iam = ck.client("iam")
 s3 = ck.client("s3")
 bucket, _, key_prefix = TARGET.split("://", 1)[1].partition("/")
 key_prefix = key_prefix.rstrip("/")
 TARGET_OBJECTS = "arn:aws:s3:::%s/%s/*" % (bucket, key_prefix)
 TARGET_BUCKET = "arn:aws:s3:::%s" % bucket
-# What Firehose itself needs to put an object at a destination, split by ARN level.
+# Permissions Firehose needs to deliver, split by bucket-level and object-level ARN.
 NEEDED = [(TARGET_BUCKET, ["s3:GetBucketLocation", "s3:ListBucket",
                            "s3:ListBucketMultipartUploads"]),
           (TARGET_OBJECTS, ["s3:PutObject", "s3:AbortMultipartUpload"])]
 
 
 def bucket_policy():
-    """The destination bucket's own policy, so a repair written there instead of on the
-    role is evaluated too rather than reported as a denial."""
+    """Return the destination bucket's policy, or None, so grants made there are evaluated too."""
     try:
         return s3.get_bucket_policy(Bucket=bucket)["Policy"]
     except Exception:
@@ -205,8 +201,8 @@ POLICY = bucket_policy()
 
 
 def denied_actions(role):
-    """Actions Firehose needs that this role is not granted, identity policies and the
-    destination bucket policy taken together."""
+    """Return the needed actions the role is denied, evaluating identity policies
+    together with the destination bucket policy."""
     out = []
     for resource, actions in NEEDED:
         kwargs = {"PolicySourceArn": role, "ActionNames": actions,
@@ -223,9 +219,10 @@ def denied_actions(role):
 
 
 def delivered(stream, deadline):
-    """Ground truth: put a record on the stream and watch for an object at the location.
-    Only reached when the authorization read says something is missing, so a correct fix
-    never pays this wait."""
+    """Put a record on the stream and wait for an object at the table location.
+
+    Only called when the policy simulation reports a missing permission.
+    """
     started = time.time()
     try:
         fh.put_record(DeliveryStreamName=stream,
@@ -267,7 +264,7 @@ for stream in sorted({served, jd_stream, glue_stream, cb_stream}):
                      "can reach %s." % (stream, TARGET))
     missing = denied_actions(role)
     if not missing:
-        continue  # fully authorised; no need to spend wall clock proving it
+        continue  # fully authorised; skip the delivery probe
     wait = min(buffer_seconds(stream) + 60, 180)
     ck.require(
         delivered(stream, wait),
@@ -282,7 +279,7 @@ for stream in sorted({served, jd_stream, glue_stream, cb_stream}):
         % (stream, TARGET, role.split("/")[-1], "; ".join(missing), key_prefix, wait,
            buffer_seconds(stream)))
 
-# ---------------------------------------------------------------- 6. protected: the streams
+# The seeded delivery streams must be unchanged.
 for name, snapshot in seed["stream_snapshots"].items():
     try:
         desc = fh.describe_delivery_stream(
@@ -311,7 +308,7 @@ for name, snapshot in seed["stream_snapshots"].items():
         "prefix; repointing an existing stream is not an accepted way to satisfy the routing "
         "requirement." % (name, json.dumps(addressing(snapshot))[:600], json.dumps(now)[:600]))
 
-# ---------------------------------------------------------------- 7. protected: the table
+# The catalog table must be unchanged.
 VOLATILE = {"CreateTime", "UpdateTime", "VersionId", "CreatedBy", "LastAccessTime",
             "LastAnalyzedTime", "IsRegisteredWithLakeFormation", "CatalogId",
             "DatabaseName", "Status", "FederatedTable"}

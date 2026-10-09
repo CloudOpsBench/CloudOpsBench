@@ -1,8 +1,11 @@
-"""Grader. Each integration path is judged by the scoping document it currently stores,
-evaluated with the real IAM policy engine (simulate-custom-policy) together with the role
-the path currently targets, so any document wording that produces the stated end state
-passes and no fix shape is graded. Isolation is judged first; restraints follow.
-Exit 0 = PASS."""
+"""Check that no vendor integration can read the pricing table and nothing else changed.
+
+Each integration (Glue job, CodeBuild project, ECS service) is evaluated with
+simulate-custom-policy against its stored session policy and the role it targets. Passes
+when every one is denied reads on the pricing table and keeps its catalog reads through
+the shared role, and the shared role, its trust policy, the reconciliation role, and the
+tables with their configuration and data are unchanged.
+"""
 import json
 
 import boto3
@@ -37,7 +40,7 @@ def need(cond, msg):
 
 
 def decide(policies, action, resource_arn):
-    """Real IAM evaluation of a set of policy documents."""
+    """Evaluate one action on one resource against the given policy documents."""
     if not policies:
         return "no-policy"
     try:
@@ -131,9 +134,7 @@ def judge_path(label, doc_text, target_role_arn, runner_role_arn, extra_evidence
              % (label, role_name_of(runner_role_arn), action, PRICING_ARN))
 
 
-# ---------------------------------------------------------------- outcome: the three paths
-
-# 1. Glue export job.
+# Glue export job.
 try:
     job = glue.get_job(JobName=seed["glue_job"])["Job"]
 except Exception as exc:
@@ -167,7 +168,7 @@ if job is not None:
                       "integration can no longer run."
                       % (seed["script_bucket"], seed["script_key"], exc))
 
-# 2. CodeBuild feed refresh.
+# CodeBuild feed refresh.
 try:
     projects = cb.batch_get_projects(names=[seed["codebuild_project"]])["projects"]
 except Exception:
@@ -281,8 +282,6 @@ else:
                  "the mirror task's container was edited (image or command differs from what "
                  "was seeded); Meridian deploys its own integration code, so the fix belongs "
                  "in the task definition's configuration, not in what the container runs.")
-
-# ---------------------------------------------------------------- restraints
 
 ROLE_DOCS, why = role_policies(ROLE_ARN)
 if not need(why is None, "the shared role %s could not be read: %s" % (ROLE, why)):

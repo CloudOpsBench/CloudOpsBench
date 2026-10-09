@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Delete the schedules that re-register the vera2-orders write-capacity scalable
+# target, then set the target's range to Min=2/Max=10.
 set -euo pipefail
 
 python3 - <<'PY'
@@ -12,7 +14,7 @@ aas = boto3.client("application-autoscaling", region_name=REGION)
 sch = boto3.client("scheduler", region_name=REGION)
 DIM = "dynamodb:table:WriteCapacityUnits"
 
-# Discover the vera2-orders-* write-capacity scalable target(s) the way an operator would (no seed files).
+# Discover the vera2-orders-* write-capacity scalable target(s) from the live account.
 targets = []
 token = None
 while True:

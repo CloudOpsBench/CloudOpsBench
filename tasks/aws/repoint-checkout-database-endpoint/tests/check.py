@@ -1,11 +1,7 @@
-"""Grader: exit 0 = PASS (the migration was done correctly).
+"""Check that the checkout service resolves the new database endpoint.
 
-The checkout service loads its DB endpoint through the 'release-current' release label. That labeled
-version is the real state the service resolves at runtime — NOT the plain latest version. A migration
-that only overwrites the parameter value (creating a new LATEST) but never advances the label leaves the
-service still pinned to the legacy endpoint: `get-parameter` (no label) shows the new value and looks
-done, while the service keeps loading the old one. The correct fix advances the release-current label to
-the new version.
+Passes when the parameter version carrying the release-current label still
+resolves and holds the new endpoint value.
 """
 import boto3
 import botocore
@@ -18,7 +14,7 @@ LABEL = seed["label"]
 NEW = seed["new_value"]
 ssm = boto3.client("ssm", region_name=R)
 
-# resolve the value the service actually loads: the version pinned by the release-current label
+# Read the version pinned by the release-current label, not the latest version.
 try:
     r = ssm.get_parameter(Name="%s:%s" % (PARAM, LABEL))
     resolved = r["Parameter"]["Value"]

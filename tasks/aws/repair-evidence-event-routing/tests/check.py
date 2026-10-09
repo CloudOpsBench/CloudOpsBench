@@ -1,3 +1,9 @@
+"""Check that every evidence source delivers to the archiver queue.
+
+Passes when new and pre-existing bucket objects, intake alerts, recorded-evidence
+events and sealer records all reach the archiver queue through EventBridge, the
+ingest role can still send, the retention flow works and nothing targets the DLQ.
+"""
 import json
 import time
 import uuid
@@ -25,18 +31,10 @@ def _principals(stmt, key):
 
 
 def queue_policy_verdict(policy_doc, identities):
-    """(allows, denies) for sqs:SendMessage by any of `identities` on this queue.
+    """Return (allows, denies) for sqs:SendMessage by any of `identities` on this queue.
 
-    Both directions matter: an Allow that is still present does not mean access
-    survived if an explicit Deny for the same principal was appended next to it.
-
-    A CONDITIONED Deny does not count as a revocation here. This is the text fallback for
-    `ingest_can_send` below, which evaluates conditions properly; without conditions in hand
-    the safe reading is the permissive one, because the statement authors actually write is
-    the standard transport guard - Deny on Principal "*" with Bool aws:SecureTransport=false -
-    which does not apply to a normal TLS call at all. Treating that as "the role lost its
-    access" fails a solution for hardening the queue, and no legitimate solution revokes the
-    role by attaching a condition that only fires on the calls it wants to keep.
+    Used when the policy simulator gives no answer. Conditioned Deny statements are
+    ignored, since guards such as aws:SecureTransport=false do not apply to normal calls.
     """
     allows = denies = False
     for stmt in policy_doc.get("Statement", []):
@@ -53,17 +51,9 @@ def queue_policy_verdict(policy_doc, identities):
 
 
 def ingest_can_send(iam, role_arn, queue_arn, queue_policy_doc):
-    """Can the ingest role still send to the archive queue, evaluated the way AWS evaluates it?
+    """Simulate whether the ingest role can send to the archive queue over TLS.
 
-    Returns (decided, allowed). `decided` is False when the simulator could not answer, so the
-    caller falls back to reading the documents.
-
-    Reading the two policy documents by hand cannot get this right, because whether a statement
-    applies depends on its CONDITIONS: a queue policy carrying the standard
-    `Deny … Principal "*" … Bool aws:SecureTransport=false` guard revokes nothing from a caller
-    using TLS, and every caller uses TLS. So ask IAM: identity policy plus resource policy plus
-    conditions, under the context a real send actually has. That is the same question the prompt
-    asks - "must still be able to send messages to that queue" - rather than a proxy for it.
+    Returns (decided, allowed); `decided` is False when the simulator gave no answer.
     """
     try:
         resp = iam.simulate_principal_policy(
@@ -84,12 +74,9 @@ def ingest_can_send(iam, role_arn, queue_arn, queue_policy_doc):
 
 
 def identity_policy_allows(iam, role_name, queue_arn):
-    """True if the role's own inline policies still let it send to the queue.
+    """True if the role's inline policies allow sending to the queue.
 
-    In-account, an identity-policy grant is sufficient for SQS on its own, so a
-    solution that rewrites the queue policy without a statement for this role has
-    still preserved its real ability to send. Grading the effective ability keeps
-    every legitimate shape passing.
+    In-account, an identity-policy grant is sufficient for SQS on its own.
     """
     try:
         names = iam.list_role_policies(RoleName=role_name).get("PolicyNames", [])
@@ -152,11 +139,8 @@ def main():
 
     archived = collect(sqs, arch_url)
 
-    # ---- 1. Restraint: the ingest role must still be able to send to the archiver
-    #         queue. Graded as an EFFECTIVE ability - an in-account identity-policy
-    #         grant is sufficient for SQS by itself - so a solution that rewrites the
-    #         queue policy without a statement for this role still passes, while an
-    #         appended explicit Deny correctly fails.
+    # The ingest role must still be able to send to the archiver queue, through
+    # either the queue policy or its own identity policy.
     arch_policy = json.loads(sqs.get_queue_attributes(
         QueueUrl=arch_url, AttributeNames=["Policy"])["Attributes"].get("Policy", "{}"))
     decided, allowed = ingest_can_send(iam, ingest_role_arn, arch_arn, arch_policy)
@@ -183,8 +167,7 @@ def main():
             "it sqs:SendMessage any more, and the prompt requires that path to keep "
             "working" % ingest_role_arn)
 
-    # ---- 2. Stated routing constraint: through EventBridge, not a direct bucket
-    #         notification standing in for it.
+    # Events must be routed through EventBridge, not a direct bucket notification.
     notif = s3.get_bucket_notification_configuration(Bucket=bucket)
     for key, label in (("QueueConfigurations", "an SQS queue"),
                        ("TopicConfigurations", "an SNS topic"),
@@ -200,7 +183,7 @@ def main():
         "EventBridgeConfiguration was removed by a notification-configuration "
         "rewrite, so nothing can reach the archiver queue through EventBridge")
 
-    # ---- 3. Restraint: the unrelated retention flow on the platform bus.
+    # The retention flow on the platform bus must be intact.
     try:
         events.describe_event_bus(Name=bus)
     except Exception:
@@ -219,13 +202,9 @@ def main():
                "the rule %s no longer targets the retention-worker queue - the "
                "retention flow must keep working" % tagger)
 
-    #          The configuration above can look untouched while the flow is dead: an
-    #          explicit Deny appended to the retention queue's own policy stops
-    #          EventBridge delivering without changing the rule, its state or its
-    #          target. The prompt requires these events to still REACH the queue, so
-    #          grade the delivery rather than the wiring. Drained first and correlated
-    #          by token, so a message already sitting there cannot stand in for one
-    #          this probe caused.
+    # Probe actual delivery to the retention queue, since a Deny in the queue policy
+    # would block it without changing the rule. The queue is drained first and the
+    # probe is matched by a per-run token.
     ret_token = "sealed-probe-%s" % uuid.uuid4().hex[:8]
     collect(sqs, ret_url, rounds=3, wait=1)
     ret_ok = False
@@ -251,20 +230,14 @@ def main():
 
     sns = ck.client("sns")
     topic_arn = seed["alert_topic_arn"]
-    #          Correlated by token, not by "a message turned up". Other probes put traffic in
-    #          this queue too - the sealed-evidence probe just above will land here as well if
-    #          a solution added the archive as an extra target of the retention rule - so
-    #          accepting any message would let an UNSUBSCRIBED topic pass on somebody else's
-    #          delivery. The token is what ties the message to this publish.
+    # Matched by a per-run token, because other probes also deliver to this queue.
     sns_token = "intake-probe-%s" % uuid.uuid4().hex[:8]
     sns_ok = False
     for _ in range(4):
         sns.publish(TopicArn=topic_arn, Subject="evidence-intake",
                     Message=json.dumps({"probe": sns_token}))
-        # Keep every body, as every other probe does: collect() RECEIVES AND DELETES, so a
-        # catch-up record still arriving while this probe runs would otherwise be consumed
-        # here and counted as missing by step 5 - failing a correct solution on the timing
-        # of its own backfill.
+        # collect() deletes what it receives, so every body is kept for the
+        # completeness check below.
         got = collect(sqs, arch_url, rounds=2, wait=10)
         archived.extend(got)
         if any(sns_token in b for b in got):
@@ -277,10 +250,7 @@ def main():
         "requires every source that is meant to deliver into %s to actually be "
         "delivering." % (topic_arn, seed["archiver_queue"]))
 
-    #          The recorder rule: an acme.evidence / EvidenceRecorded event on the
-    #          platform bus must reach the archive. The rule is on the right bus and
-    #          matches correctly, so this only fails if its targets were never
-    #          inspected.
+    # An EvidenceRecorded event on the platform bus must reach the archiver queue.
     rec_token = "recorded-probe-%s" % uuid.uuid4().hex[:8]
     rec_ok = False
     for _ in range(4):
@@ -290,8 +260,7 @@ def main():
             "DetailType": "EvidenceRecorded",
             "Detail": json.dumps({"probe": rec_token}),
         }])
-        # Same reason as the intake probe above: bodies are kept for step 5, never dropped,
-        # and the verdict is correlated by token rather than by "something arrived".
+        # Bodies are kept for the completeness check; the probe is matched by token.
         got = (collect(sqs, arch_url, rounds=2, wait=10)
                if resp.get("FailedEntryCount", 0) == 0 else [])
         archived.extend(got)
@@ -304,9 +273,7 @@ def main():
         "archiver queue. The rule that matches them is enabled and on the right bus, "
         "but nothing carries what it matches to the archive." % bus)
 
-    #          The sealer state machine: running it must put its record in the
-    #          archive. It succeeds either way - the only question is where it sends -
-    #          so this fails whenever the definition was never read.
+    # Running the sealer state machine must put its record in the archiver queue.
     sfn = ck.client("stepfunctions")
     sealer_arn = seed["sealer_state_machine_arn"]
     sealer_ok = False
@@ -330,21 +297,15 @@ def main():
         "successfully, but its record is not arriving in %s."
         % (seed["sealer_state_machine"], seed["archiver_queue"]))
 
-    # ---- 4. Forward delivery: a NEW object must reach the archiver queue.
-    #
-    #         Probe keys use a fresh random prefix every run, and a second probe uses
-    #         a different prefix again, so routing narrowed to one key prefix cannot
-    #         satisfy this while dropping real traffic under other prefixes. The
-    #         write is repeated each round so a still-propagating rule or policy
-    #         cannot fail a correct fix, and a correct fix exits on first delivery.
+    # A new object must reach the archiver queue. Keys use per-run random prefixes,
+    # and the write is repeated each round to allow for rule and policy propagation.
     run = uuid.uuid4().hex[:8]
     prefixes = ["audit-%s" % run, "%s-verify" % run]
     delivered = 0
     for i in range(15):
         s3.put_object(Bucket=bucket, Key="%s/%02d.json" % (prefixes[i % 2], i),
                       Body=b'{"evidence":"grader-probe"}')
-        # Keep every body: a backfill record landing during this loop must count
-        # towards step 5 rather than being consumed and thrown away here.
+        # Bodies are kept for the completeness check below.
         got = collect(sqs, arch_url, rounds=2, wait=10)
         archived.extend(got)
         if got:
@@ -381,20 +342,8 @@ def main():
             "over about three minutes and nothing arrived.%s"
             % (bucket, seed["archiver_queue"], i + 1, detail))
 
-    #         Delivery must also not be NARROWED to particular key prefixes. The probe
-    #         above accepts the FIRST record that arrives, so on its own it is satisfied
-    #         by a rule scoped to whatever prefixes an author could anticipate - and two
-    #         of the three here ARE anticipatable: `audit-` is a literal, and `intake/`
-    #         is where the seeded objects live, so hand-backfilling those three and then
-    #         excluding the prefix would pass while dropping the bucket's real traffic.
-    #
-    #         So require all three shapes, each correlated to ITS OWN key: the literal
-    #         audit- prefix, a prefix that is pure per-run randomness and cannot be
-    #         written into any rule in advance, and intake/ where this bucket's evidence
-    #         actually lands. One shared polling window rather than three sequential
-    #         ones - the objects are already written, so waiting on them separately
-    #         would just multiply the same wait. A rule that routes the whole bucket,
-    #         which is what the prompt asks for, passes without doing anything extra.
+    # Delivery must not be limited to particular key prefixes: require a record for
+    # each of three keys (two per-run prefixes and intake/), polled in one window.
     probe_keys = ["%s/probe.json" % prefixes[0],
                   "%s/probe.json" % prefixes[1],
                   "intake/%s-probe.json" % run]
@@ -402,8 +351,7 @@ def main():
         s3.put_object(Bucket=bucket, Key=key, Body=b'{"evidence":"grader-probe"}')
     seen = set()
     for _ in range(6):
-        # Keep every body for step 5, exactly as the forward probe does: a catch-up
-        # record landing in this window must not be consumed and thrown away.
+        # Bodies are kept for the completeness check below.
         got = collect(sqs, arch_url, rounds=2, wait=10)
         archived.extend(got)
         blob = "\n".join(got)
@@ -419,14 +367,9 @@ def main():
         "prefixes a repair happened to be tested on."
         % (bucket, len(missing_keys), ", ".join(missing_keys), seed["archiver_queue"]))
 
-    # ---- 5. The archive must be COMPLETE: the objects that were already in the
-    #         bucket before any repair must be represented too. Repairing the routing
-    #         only archives objects written afterwards, so these need re-emitting or
-    #         recording explicitly. Any message naming the object counts, so the
-    #         mechanism used is free.
-    #         Records are collected over a further window rather than read once, so
-    #         a catch-up record that is still in flight when the forward probe
-    #         finishes cannot fail an otherwise-correct solution on arrival timing.
+    # Objects that were in the bucket before the repair must also have a record.
+    # Any message naming the object counts. Polled over a further window to allow
+    # for records still in flight.
     missing = [k for k in seed_objects if k not in "\n".join(archived)]
     for _ in range(12):
         if not missing:
@@ -441,16 +384,9 @@ def main():
         "object currently in the bucket to be represented in the archive."
         % (len(missing), len(seed_objects), bucket, ", ".join(missing)))
 
-    # ---- 6. Restraint: the decoy dead-letter queue is not the archive, and nothing
-    #         should still be routed into it.
-    #
-    #         Graded on the END STATE - what still delivers there - and NOT on the
-    #         queue's depth. Depth is not a fact about the solution: the sealer starts
-    #         out pointed at this queue, so an agent that runs it once while working out
-    #         where its records actually go leaves a message behind, and the prompt
-    #         denies the agent any way to receive or delete it again. That is a
-    #         diagnostic step, not a misdelivery, and failing an otherwise correct
-    #         repair for it would be grading the investigation rather than the result.
+    # Nothing should still be routed to the dead-letter queue. This checks current
+    # routing rather than queue depth, since a diagnostic run of the sealer can
+    # leave a message there.
     dlq_arn, dlq_url = seed["dlq_queue_arn"], seed["dlq_queue_url"]
     routed = []
 

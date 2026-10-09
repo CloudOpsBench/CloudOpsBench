@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# Tear down the pricing experiment fixture.
-#
-# Order matters: access points must go before the bucket they front, and the
-# multipart upload must be aborted or the bucket refuses to delete while its
-# parts are still there. Secrets are always FORCE-deleted, or a 30-day recovery
-# window blocks the next setup from recreating them.
-#
-# Everything here tolerates a partly-solved episode: the agent may already have
-# removed any subset of these.
+# Tears down the pricing experiment fixture. Access points are removed before
+# the bucket, multipart uploads are aborted so the bucket can be deleted, and
+# secrets are force-deleted so the next setup can recreate them. Tolerates
+# resources that are already gone.
 set -euo pipefail
 
 _ts() { date -u +'%Y-%m-%dT%H:%M:%SZ'; }

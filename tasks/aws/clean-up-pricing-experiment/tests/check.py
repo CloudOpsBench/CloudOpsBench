@@ -1,61 +1,8 @@
-"""DETERMINISTIC grader for the pricing experiment cleanup task.
+"""Check that the pricing experiment is removed and Finance's resources are intact.
 
-Contract:
-  * Exit 0  -> the agent achieved the goal (PASS).
-  * Exit !=0 -> failure; print ONE clear reason to stderr (use fail()).
-  * Inspect the LIVE cloud via boto3 only. No LLM judge.
-  * Correlate via seed_state.json (written by setup.sh).
-  * Finish within 120s (reads only — deletes nothing).
-
-Design note — why this task is hard, and why it is fair:
-  THE CENTREPIECE: the experiment's queries wrote a full copy of the data
-  somewhere else. Athena writes every query's RESULT SET — the returned
-  customer rows themselves — to the output location configured on the
-  WORKGROUP. That location is a prefix in the shared analytics bucket, not
-  inside anything the agent deletes. Delete the workgroup and `list-work-groups`
-  comes back clean while the result sets sit untouched. THE ANSWER OUTLIVES THE
-  QUESTION.
-
-  The mechanism is declared on a DIFFERENT object from the residue (task 28's
-  lesson), and what makes deletion non-final — versioning — is declared at
-  BUCKET level, on a bucket that must survive. Account/bucket-level is the
-  strongest tier: task 27 scored 1/8 @ 0.91 that way, task 28 only 2/8 @ 0.88
-  with the behaviour declared on its own target.
-
-  STRUCTURE: the analytics bucket MUST SURVIVE — Finance's weekly revenue
-  reporting writes into it — so the target is a PREFIX inside it. Nothing can
-  be deleted by name, nothing swept by tag; every keeper sits in the same four
-  services as the targets.
-
-  Supporting surfaces, every one with a measured kill record:
-    * `s3 rm` on a versioned bucket writes a delete marker: the prefix lists as
-      empty while every byte stays readable by version id      (task 11, 0/8)
-    * an abandoned multipart upload never appears in `ls` and survives
-      `rm --recursive`                                         (review, 2/2)
-    * an S3 access point lives in a different API from list-buckets
-                                                               (task 26, 0/8)
-    * `delete-secret` only SCHEDULES deletion: success is returned, the secret
-      leaves list-secrets, the value stays restorable          (task 24, 1/17)
-
-  NOTHING IS HIDDEN. The output location is one `get-work-group` call away, the
-  prefix is named after the experiment, and every object, workgroup, secret and
-  role carries project=price-test. Finding these was never the hard part;
-  noticing that removing them reports success without removing them is.
-
-  GENRE IS DELETION. Every target is a discrete object or a listable set that
-  either exists or does not. No policy document has to be edited correctly, so
-  there is nothing for a grader to argue about.
-
-Every check maps to a clause of the prompt:
-  "nothing it produced or used is still here, including any copy of the
-   customer rows its queries returned"
-        -> no versions, no delete markers and no unfinished upload under the
-           experiment's prefix; the access point, the workgroup and the role gone
-  "the pricing API key cannot be recovered"
-        -> the secret destroyed, not merely scheduled
-  "Finance's weekly revenue reporting still runs, so leave that working"
-        -> the bucket, their results, their access point, their workgroup,
-           their warehouse DSN and their role all intact
+Passes when no versions, delete markers or unfinished uploads remain under the
+experiment prefix, its access point, workgroup, role and secret are gone (the secret
+not merely scheduled for deletion), and the bucket and Finance's resources still exist.
 """
 from __future__ import annotations
 
@@ -128,7 +75,7 @@ keeper_role = seed["keeper_role"]
 
 
 def _versions(prefix, key="Versions"):
-    """Paginated, so residue cannot hide past the first page."""
+    """List every version (or delete marker) under the prefix, following pagination."""
     out, km, vm = [], None, None
     while True:
         kw = {"Bucket": bucket, "Prefix": prefix, "MaxKeys": 500}
@@ -188,11 +135,7 @@ def _work_group_names():
     return out
 
 
-# =============================================================================
-# 1. Finance's reporting must survive. Checked FIRST: emptying the shared
-#    analytics bucket breaks a job that runs every Monday, and breaking
-#    production is worse than leaving residue behind.
-# =============================================================================
+# Finance's resources must survive; checked first.
 try:
     s3.head_bucket(Bucket=bucket)
 except ClientError:
@@ -234,14 +177,10 @@ except ClientError:
     fail(f"the IAM role {keeper_role} was deleted — Finance's reporting runs as it")
 
 
-# =============================================================================
-# 2. Everything the experiment left, polled against ONE shared deadline.
-#    Async deletion and eventually consistent reads are two distinct hazards
-#    and one 60s budget covers both.
-# =============================================================================
+# The experiment's resources are polled against one shared 60s deadline, which
+# covers asynchronous deletion and eventually consistent reads.
 def _still(fn) -> bool:
-    """On an API error we cannot interpret, treat the resource as STILL THERE.
-    Never pass a leftover silently."""
+    """Call fn; on an API error other than not-found, treat the resource as still present."""
     try:
         return fn()
     except ClientError as e:
@@ -278,8 +217,7 @@ def _work_group_there():
 
 
 def _secret_there():
-    # describe-secret STILL RESOLVES a secret inside its recovery window, which
-    # is exactly what a plain delete-secret leaves behind.
+    # describe-secret still resolves a secret that is inside its recovery window.
     sec.describe_secret(SecretId=target_secret)
     return True
 

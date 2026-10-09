@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Repoints every writer that targets the retired archive bucket (Firehose, DataSync,
+# S3 replication and its role policy, VPC flow logs, access logging, Athena
+# workgroups) at the replacement bucket, in both regions.
 set -euo pipefail
 python3 - <<'PY'
 import boto3, json, os, time
@@ -21,7 +24,7 @@ def bucket_region(name):
         return REGION
 
 
-# --- 1. repoint every Firehose delivery stream that lands in the retired bucket ----------
+# repoint every Firehose delivery stream that lands in the retired bucket
 for reg in REGIONS:
     fh = boto3.client("firehose", region_name=reg)
     try:
@@ -41,7 +44,7 @@ for reg in REGIONS:
             ExtendedS3DestinationUpdate={"BucketARN": "arn:aws:s3:::" + NEW})
         print("repointed delivery stream", name)
 
-# --- 2. rebuild every DataSync task whose destination is the retired bucket --------------
+# rebuild every DataSync task whose destination is the retired bucket
 for reg in REGIONS:
     ds = boto3.client("datasync", region_name=reg)
     try:
@@ -71,7 +74,7 @@ for reg in REGIONS:
         ds.create_task(**kwargs)
         print("rebuilt DataSync task", d.get("Name"), "in", reg)
 
-# --- 3. the role that performs replication must be able to write where it now delivers ---
+# the role that performs replication must be able to write where it now delivers
 iam = boto3.client("iam")
 repl_roles = set()
 for b in buckets:
@@ -100,7 +103,7 @@ for role in repl_roles:
             print("granted", role, "write access to", NEW)
 time.sleep(12)
 
-# --- 4. repoint every replication rule that delivers into the retired bucket -------------
+# repoint every replication rule that delivers into the retired bucket
 for b in buckets:
     reg = bucket_region(b)
     c = boto3.client("s3", region_name=reg)
@@ -117,7 +120,7 @@ for b in buckets:
         Bucket=b, ReplicationConfiguration={"Role": cfg["Role"], "Rules": cfg["Rules"]})
     print("repointed archive replication rule on", b, "in", reg)
 
-# --- 5. move every VPC flow log that lands in the retired bucket -------------------------
+# move every VPC flow log that lands in the retired bucket
 for reg in REGIONS:
     ec2 = boto3.client("ec2", region_name=reg)
     try:
@@ -136,7 +139,7 @@ for reg in REGIONS:
         ec2.delete_flow_logs(FlowLogIds=[f["FlowLogId"]])
         print("moved flow log", f["FlowLogId"], "in", reg)
 
-# --- 6. move server access logging that lands in the retired bucket ----------------------
+# move server access logging that lands in the retired bucket
 for b in buckets:
     c = boto3.client("s3", region_name=bucket_region(b))
     try:
@@ -149,7 +152,7 @@ for b in buckets:
     c.put_bucket_logging(Bucket=b, BucketLoggingStatus={"LoggingEnabled": log})
     print("moved access logging on", b)
 
-# --- 7. move any query workgroup parking its results in the retired bucket ---------------
+# move any query workgroup parking its results in the retired bucket
 for reg in REGIONS:
     ath = boto3.client("athena", region_name=reg)
     try:

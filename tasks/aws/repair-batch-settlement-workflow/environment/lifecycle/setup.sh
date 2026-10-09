@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates the batch-settlement Step Functions state machine with a faulty JSONata
+# transform, publishes it as a version, and points the `live` and `audit` aliases
+# at that version. Records the ARNs in seed_state.json.
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"

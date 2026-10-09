@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes the buckets recorded in seed_state.json, then any remaining vera2- buckets.
 set -uo pipefail
 python3 - <<'PYEOF' 2>/dev/null || true
 import json, boto3
