@@ -1,0 +1,57 @@
+[task]
+name = "restrict-vendor-session-table-access"
+description = "Cut an external vendor's sessions off from a reclassified DynamoDB table across every integration path"
+
+[metadata]
+
+initial_state_description = """
+Two DynamoDB tables in us-east-1 hold data shared with an external analytics vendor. The
+vendor's integrations run inside the account and none of them holds standing table
+permissions: each one assumes one shared IAM role and passes a scoping document when it
+does, so that document is the only thing narrowing the session below the role's full
+grant. Three integrations exist, on three different services, and each stores its own
+inline copy of the scoping document in its configuration rather than a reference to the
+IAM policy the text was pasted from. That source IAM policy has already been rewritten to
+exclude the pricing table, is on its latest default version and is tagged remediated, but
+it is attached to nothing and every stored copy still carries the old text granting both
+tables. Two of the three run in the home region, on a data-preparation job and on a build
+project. The third is an ECS worker service in ANOTHER REGION, and nothing in the home
+region names it, names its region, or records how many integrations exist: the role it
+runs as is a generic platform worker role carrying no vendor name, and it reaches the
+shared role through a managed policy rather than through an inline grant naming it, so
+searching the home region for the shared role's ARN returns only the other two. That
+worker runs under an external deployment controller, so
+what it executes is bound by its task sets rather than by the service itself, its task
+definitions are immutable, and making a corrected task set primary does not retire the old
+one. An internal reconciliation role assumes the same shared role directly, with no
+scoping document, and legitimately needs both tables.
+"""
+
+outcome_description = """
+No session the vendor's integrations can obtain reads anything from the pricing table:
+whatever document each integration now passes when it assumes the shared role, evaluated
+with the role's own permissions, denies GetItem, BatchGetItem, Query and Scan against the
+pricing table, while the same four read actions against the catalog table keep working for
+every integration through its existing path. All three integration paths still exist, are
+still enabled, can still obtain credentials, and their own code is unedited. The shared
+role keeps its broad permissions and its trust behavior, the reconciliation role keeps its
+way in, and the two tables keep their configuration, their data, and their absence of
+resource policies. Any document wording that produces this end state counts, and repointing
+an integration at a different, properly scoped role also counts.
+"""
+
+criteria_descriptions = [
+  "there are exactly three integration paths and all three are graded: the Glue job meridian-catalog-export (its job arguments hold the scoping document), the CodeBuild project meridian-feed-refresh (its environment variables hold it), and the ECS worker service meridian-mirror-svc, which runs in a DIFFERENT REGION from the other two and holds it in the environment of the task definition its task sets run",
+  "for each of those three paths, the scoping document it currently stores (or the role fallback, if the document was removed) evaluates to a denial for GetItem, BatchGetItem, Query and Scan on the pricing table, using the real IAM policy engine; a run that scopes only the two paths in the home region leaves the third vending pricing access and fails here",
+  "for each of the three paths, GetItem, BatchGetItem, Query and Scan on the catalog table still evaluate as allowed through the document and the role the path currently targets",
+  "the ECS worker runs under an external deployment controller, so EVERY task set that can still launch a task is graded, not just the primary one: registering a corrected task definition without running it, creating a task set without making it primary, and making a corrected task set primary while leaving the old one live all still fail, and retiring the stale task set either by deleting it or by scaling it to zero both pass",
+  "each integration path still exists, and the role it runs as still holds permission to assume the role the path currently targets",
+  "each integration's own code is unchanged: the stored script objects, the build commands and the container command and image all match what was seeded",
+  "the shared role's own permissions still allow all four read actions on both tables, so the reconciliation path keeps full breadth",
+  "the shared role's trust policy still allows what it allowed at the start, with no new conditions and no explicit denies added",
+  "the reconciliation role still exists and its policies still allow assuming the shared role",
+  "both tables still exist, every seeded item reads back unchanged, and neither table has acquired a resource-based policy",
+]
+
+keywords = ["aws", "dynamodb", "iam", "sts", "ecs", "security", "multi-region"]
+extra_tools = []

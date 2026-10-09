@@ -1,0 +1,24 @@
+[task]
+name = "restore-backup-plan-coverage"
+description = "Restore AWS Backup plan coverage for a tagged resource fleet that has no recovery points, while ensuring the plan does not back up its scratch bucket."
+
+[metadata]
+initial_state_description = "An AWS Backup plan in us-east-1 selects resources tagged backup=nightly into a vault, using a role that carries the AWS managed backup policies plus an inline deny on all elasticfilesystem actions. The fleet is two DynamoDB tables, two encrypted EFS file systems, and a scratch S3 bucket; one table lacks the backup tag, and the account's regional opt-in is disabled for EFS and for S3, the latter being the only thing keeping the tagged scratch bucket out. One of the file systems also carries a file system policy that explicitly denies elasticfilesystem:Backup, which only takes effect once the opt-in and the role are fixed."
+outcome_description = "Both tables and both file systems are matched by a selection on the plan, and backup jobs the grader starts for them into the vault with the matching selection's role complete. The scratch bucket is still not backed up by the plan, and the plan, the vault, and the fleet resources remain the seeded ones rather than being deleted or recreated."
+criteria_descriptions = [
+    "The seeded backup plan can be read.",
+    "The seeded backup vault can be read.",
+    "The plan has at least one backup selection.",
+    "For each of the two tables and two file systems that a selection matches, AWS Backup accepts a backup job into the vault using the role of at least one matching selection.",
+    "Each started backup job reaches the COMPLETED state within the 420 second deadline.",
+    "Each of the two tables and two file systems is matched by at least one selection on the plan.",
+    "If any selections on the plan match the scratch bucket, a backup job using the first matching selection's role is refused. The grader does not test the other matching selections' roles for this bucket.",
+    "The vault holds no recovery points for the scratch bucket.",
+    "At least one rule on the plan still targets the seeded vault.",
+    "Both tables, both file systems, the scratch bucket, and the vault still exist.",
+    "Each table has the same table id as the seeded table.",
+    "The scratch bucket has the same creation date as the seeded bucket.",
+    "The vault has the same creation date as the seeded vault.",
+]
+keywords = ["aws", "backup", "dynamodb", "efs", "s3", "iam", "data-protection"]
+extra_tools = []

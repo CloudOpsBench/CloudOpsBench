@@ -1,0 +1,46 @@
+[task]
+name = "repair-evidence-event-routing"
+description = "Repair a compliance evidence pipeline that has silently captured nothing, across every source that feeds it"
+
+[metadata]
+
+initial_state_description = """
+A compliance evidence pipeline is fully built and has never delivered a single record, with no
+error, dead-letter or failed-invocation signal anywhere. Objects sit in an evidence-store bucket
+that does emit to EventBridge, but its capture rule is stranded on a custom platform bus where S3
+events can never arrive, and the archiver queue's EventBridge grant is pinned by an aws:SourceArn
+condition to that rule's current bus-qualified ARN. Three more sources are meant to feed the same
+queue and none of them do: an intake-alert SNS topic that is neither subscribed to the queue nor
+granted access to it, a recorder rule that matches the right events and has no target at all, and
+a sealer state machine whose SDK integration succeeds every time while sending its output to a
+dead-letter queue named by a stale SSM parameter. A separate retention flow on the same bus works
+correctly and must stay that way."""
+
+outcome_description = """
+Every source that is meant to deliver into the archiver queue actually delivers: objects written
+to the evidence bucket, alerts published to the intake topic, recorded-evidence events on the
+platform bus, and runs of the sealer state machine all produce a record in the archive. Object
+events still travel through EventBridge rather than a direct bucket notification. The archive is
+also complete rather than merely working from now on — the objects that were already in the bucket
+before the repair are represented too, replayed only after the repaired route was verified live,
+since an evidence event emitted before a route carries traffic is discarded silently. The
+evidence-ingest role can still send to the queue, the unrelated retention flow still delivers to
+its own queue, and nothing has been repointed into the dead-letter queue. Any routing shape that
+achieves this passes; the reference shape is not required."""
+
+criteria_descriptions = [
+  "the evidence-ingest role can still send messages to the archiver queue, judged on its effective permission - queue policy and identity policy evaluated together, with conditions, over TLS",
+  "the bucket still emits object events to EventBridge and no direct queue, topic or Lambda notification stands in for that routing",
+  "the platform event bus and the retention-tagger rule still exist, the rule is enabled and still targets the retention-worker queue",
+  "an acme.evidence EvidenceSealed event published on the platform bus still arrives in the retention-worker queue",
+  "an alert published to the intake-alert SNS topic arrives in the archiver queue",
+  "an acme.evidence EvidenceRecorded event published on the platform bus arrives in the archiver queue",
+  "running the evidence-sealer state machine puts its sealed-evidence record in the archiver queue",
+  "a newly written object in the evidence bucket produces a message in the archiver queue",
+  "objects written under three different key prefixes - including one that is per-run randomness and one under intake/ - each produce their own archive record, so routing narrowed to particular prefixes does not pass",
+  "every object that was already in the bucket before the repair is represented in the archiver queue",
+  "nothing still routes evidence into the decoy dead-letter queue - not the sealer's definition, not an EventBridge rule on either bus, not a topic subscription",
+]
+
+keywords = ["compliance", "eventbridge", "silent-failure", "multi-source", "backfill", "ordering"]
+extra_tools = []

@@ -1,0 +1,10 @@
+[task]
+name = "delete-decommissioned-s3-buckets"
+description = "Delete every vera2 S3 bucket in us-east-1 as part of decommissioning the project."
+
+[metadata]
+initial_state_description = "One general-purpose S3 bucket named with a vera2-data- prefix is created in us-east-1. An S3 table bucket named with a vera2-warehouse- prefix is created in the same region; table buckets belong to the separate s3tables service and are not returned by list-buckets."
+outcome_description = "Neither the general-purpose bucket nor the table bucket exists any longer. The table-bucket listing must be readable for the grader to confirm the table bucket is gone."
+criteria_descriptions = ["The seeded general-purpose bucket no longer exists.", "The seeded table bucket's ARN no longer appears in the region's table-bucket listing.", "The table-bucket listing call succeeds; a listing error is treated as a failure."]
+keywords = ["aws", "s3", "s3tables", "decommissioning"]
+extra_tools = []

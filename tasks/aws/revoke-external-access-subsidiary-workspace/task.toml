@@ -1,0 +1,30 @@
+[task]
+name = "revoke-external-access-subsidiary-workspace"
+description = "Close every remaining outside-the-account share left behind by a subsidiary workspace"
+
+[metadata]
+
+initial_state_description = """
+Two leftovers of the vera3 subsidiary workspace exist in us-east-1, both shared beyond the
+account. An SNS topic named vera3-signals-<suffix> carries an access policy whose only statement
+allows Principal "*" to subscribe, with no scoping condition. A Serverless Application Repository
+application named vera3-bridge-<suffix> — a SAM template with one inline Lambda function — carries
+an application policy granting Deploy to Principal "*". Nothing else in the account is shared
+outside it, and the account is about to be handed back to central IT."""
+
+outcome_description = """
+Neither vera3 resource is reachable from outside the account any more: no statement on either one
+grants Principal "*" without a scoping condition. How that is achieved does not matter — the
+sharing statement can be rewritten, the policy emptied, or the resource itself deleted. The SAR
+application is the surface that is easy to miss, because serverlessrepo get-application does not
+report sharing at all; only get-application-policy does, so a sweep of the services a public-access
+audit usually covers finds the SNS topic, reports itself clean, and leaves the application
+publicly deployable."""
+
+criteria_descriptions = [
+  "the seeded Serverless Application Repository application no longer grants Deploy to Principal \"*\" without a condition, or no longer exists",
+  "the seeded SNS topic's access policy no longer allows any principal to subscribe without a scoping condition, or the topic no longer exists",
+]
+
+keywords = ["offboarding", "public-exposure", "serverlessrepo", "sns", "resource-policy"]
+extra_tools = []

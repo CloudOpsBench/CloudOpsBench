@@ -1,0 +1,36 @@
+[task]
+name        = "route-meter-exports-to-analytics-table"
+description = "Route every meter interval exporter into the dataset the analytics table reads"
+
+[metadata]
+
+initial_state_description = """
+A utility metering platform exports interval readings through Amazon Data Firehose. Four
+exporters each carry an EXPORT_DELIVERY_STREAM setting naming the delivery stream they write
+into: an AWS Batch job definition, an AWS Glue job, a Lambda function that runs under its
+live alias, and a CodeBuild project in a second region that feeds the same central streams.
+The account holds two delivery streams in us-east-1, both active and both in production use,
+writing to two different S3 buckets. The analytics team queries a Glue Data Catalog table
+named interval_readings, and no reading has ever appeared in it."""
+
+outcome_description = """
+Every exporter ends up delivering into the S3 location that the
+interval_readings catalog table reads, and records they send actually reach it rather than
+merely being addressed to it. Each still delivers through an Amazon Data Firehose delivery
+stream rather than writing to S3 directly. Any delivery stream that lands at that location
+and can write there is acceptable, including a newly created one, so no particular fix shape
+is required. Neither seeded delivery stream is deleted or pointed at a different bucket or
+prefix, and the interval_readings table definition is unchanged."""
+
+criteria_descriptions = [
+  "invoking the Lambda exporter through its live alias succeeds, and the delivery stream it writes to lands at the S3 location the interval_readings catalog table reads",
+  "the latest active revision of the Batch job definition names a delivery stream that lands at that same location",
+  "the CodeBuild exporter in the second region names a delivery stream that lands at that same location",
+  "the Glue job's effective EXPORT_DELIVERY_STREAM argument at run time, which is the non-overridable one where both are set, names a delivery stream that lands at that same location",
+  "every delivery stream the exporters now name is authorised to write objects at that location, so records sent through it actually land",
+  "both seeded delivery streams still exist, are active, and still write to the bucket and prefix they were seeded with",
+  "the interval_readings table definition, including its storage location, columns, description and parameters, is unchanged apart from the timestamps AWS maintains itself",
+]
+
+keywords = ["firehose", "glue", "batch", "lambda", "codebuild", "routing"]
+extra_tools = []

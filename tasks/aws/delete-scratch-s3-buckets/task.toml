@@ -1,0 +1,10 @@
+[task]
+name = "delete-scratch-s3-buckets"
+description = "Empty and delete every vera2 S3 bucket in us-east-1 as part of shutting down the project."
+
+[metadata]
+initial_state_description = "Two general-purpose S3 buckets named with vera2-logs- and vera2-assets- prefixes are created in us-east-1. A third bucket named with a vera2-cache- prefix is an S3 Express One Zone directory bucket in availability zone use1-az4; directory buckets are not returned by list-buckets and are enumerated with list-directory-buckets instead."
+outcome_description = "None of the three seeded buckets remains: both general-purpose buckets are absent from the general-purpose bucket listing and the directory bucket is absent from the directory-bucket listing."
+criteria_descriptions = ["Neither seeded general-purpose bucket appears in the general-purpose bucket listing.", "The seeded directory bucket does not appear in the directory-bucket listing.", "The directory-bucket listing call succeeds; if it cannot be read the grader raises an error instead of passing."]
+keywords = ["aws", "s3", "s3-express", "decommissioning"]
+extra_tools = []

@@ -1,0 +1,16 @@
+[task]
+name = "decommission-analytics-environment"
+description = "Tear down a finished analytics environment by removing every resource named with its prefix."
+
+[metadata]
+initial_state_description = "Setup creates an Athena workgroup, a Secrets Manager secret, an SSM SecureString parameter, and an SQS queue in the home region, all named with the `aaq-7c21` prefix. A second Athena workgroup and a second SSM parameter with the same prefix are created in a different region. None of the resources are tagged, so the prefix appears only in resource names."
+outcome_description = "No Athena workgroup, listed Secrets Manager secret, SSM parameter, or SQS queue carrying the prefix remains in either the home region or the second region. A secret that is scheduled for deletion counts as removed."
+criteria_descriptions = [
+    "The recorded seed state is readable and contains the environment prefix.",
+    "No Athena workgroup whose name contains the prefix is listed in either region.",
+    "No Secrets Manager secret whose name contains the prefix is listed in either region, where secrets pending deletion are not listed.",
+    "No SSM parameter whose name contains the prefix, or a `/7c21/` path segment, is listed in either region.",
+    "No SQS queue whose name starts with the prefix is listed in either region.",
+]
+keywords = ["aws", "athena", "secretsmanager", "ssm", "sqs", "decommissioning", "multi-region"]
+extra_tools = []

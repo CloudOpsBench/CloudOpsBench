@@ -1,0 +1,10 @@
+[task]
+name = "repoint-checkout-database-endpoint"
+description = "Update the Parameter Store configuration so the vera2 checkout service uses the new database endpoint."
+
+[metadata]
+initial_state_description = "A String parameter under the /vera2/ path ending in checkout/db-endpoint is created in SSM Parameter Store with the legacy database hostname as version 1. That version carries the parameter label release-current, which is the reference the checkout service resolves; labels do not move when a new version is written."
+outcome_description = "The checkout service loads aurora-pg.vera2.internal: resolving the seeded parameter name through the release-current label returns exactly that value. The grader checks the labeled lookup's result, not the repair method or preservation of the original parameter's version history."
+criteria_descriptions = ["The parameter still resolves through the release-current label.", "The value resolved through the release-current label is exactly aurora-pg.vera2.internal."]
+keywords = ["aws", "ssm", "parameter-store", "configuration"]
+extra_tools = []

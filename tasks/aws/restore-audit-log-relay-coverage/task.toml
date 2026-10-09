@@ -1,0 +1,41 @@
+[task]
+name = "restore-audit-log-relay-coverage"
+description = "Restore full audit relay coverage across a fleet of application log groups"
+
+[metadata]
+
+initial_state_description = """
+An account relays application logs into Kinesis data streams named audit-relay-stream-*, written
+by CloudWatch Logs through a role named audit-relay-cwl-*. Five application log groups sit under
+the /svc/ prefix in us-east-1: one has a subscription filter to the audit stream whose filter
+pattern forwards only lines containing ERROR, one has a filter pointing at a retired archive
+stream instead, one has no filter at all, one was created in the Infrequent Access log class and
+therefore cannot carry a subscription filter, and the last holds third party vendor payloads. A
+sixth application log group runs in us-west-2 against its own audit stream there. No account
+level subscription filter policy exists in either region, so a log group created by a deployment
+tomorrow is relayed by nothing.
+"""
+
+outcome_description = """
+Log events written to any /svc/ log group arrive in the audit Kinesis stream of that group's own
+region in full rather than as a filtered subset, and that keeps being true for a /svc/ log group
+created after the work is finished, without that group being set up individually. Events written
+to the vendor callback log group never arrive. Every seeded /svc/ log group still exists under
+its original name with the retention it started with, the vendor log group is otherwise
+untouched, and both audit streams and the relay role still exist unchanged. Any route to that end
+state counts: console, CLI, SDK or infrastructure code are all acceptable so long as the delivery
+outcome holds.
+"""
+
+criteria_descriptions = [
+  "a log group the grader creates under the /svc/ prefix in each region after the agent finished delivers all four probe lines to that region's audit stream, and carries no subscription filter of its own, so its coverage came from something that does not reach into each new group",
+  "every other /svc/ log group present at grading time in either region, seeded or left behind by the agent, delivers all four probe lines to its own region's audit stream; the four message shapes are drawn at random at grading time from a pool of eight and carry independent random tokens, so no filter pattern can cover them and no narrowing pattern or wrong destination survives",
+  "no line written to the seeded vendor callback log group, the one exception the prompt names, reaches the audit stream, checked past the point where every other group's lines have already arrived",
+  "all six seeded /svc/ log groups, in both regions, still exist under their original names",
+  "every seeded /svc/ log group still has the retention in days it was seeded with",
+  "the vendor callback log group still has its seeded creation time, log class, KMS key, data protection status and tags, and still carries no subscription filter, so it was left otherwise untouched",
+  "both audit Kinesis streams still exist with their seeded ARNs and creation timestamps, and the relay role still exists with its seeded RoleId, so none was rebuilt under the same name",
+]
+
+keywords = ["aws", "cloudwatch-logs", "kinesis", "iam", "audit", "multi-region"]
+extra_tools = []
