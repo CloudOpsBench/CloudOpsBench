@@ -1,0 +1,36 @@
+[task]
+name = "repair-lambda-canary-rollback-guardrail"
+description = "Repair a Lambda canary deployment guardrail in place so the live alias, CodeDeploy deployment group, error alarm, and CodeDeploy role match the required secure rollback profile."
+
+[metadata]
+initial_state_description = "A Lambda function has two published versions, stable and candidate, and its live alias points at the candidate with a 50 percent weight on the stable version. A CodeDeploy Lambda application and deployment group use the all-at-once configuration with alarm monitoring and automatic rollback disabled. The seeded Errors alarm is scoped to the whole function rather than the alias, uses a five-minute period with a threshold of more than two errors, and treats missing data as breaching. The CodeDeploy service role carries the broad AWS managed AWSCodeDeployRoleForLambda policy, and neither the function nor that role has the SecurityProfile tag."
+outcome_description = "The live alias targets only the stable version, the existing deployment group uses the 10-percent/five-minute canary with rollback on failure and alarm breach while watching only the seeded alarm, and that alarm is scoped to the live alias with a one-minute, one-error, missing-data-healthy definition. The CodeDeploy role grants unconditional alias management only on the live alias plus alarm reads, with no unrelated actions, and the function and role carry the SecurityProfile tag. The function, its code and configuration, both published versions, the alias, the CodeDeploy application and group, both roles, and the ownership tags must be the original seeded resources rather than replacements."
+criteria_descriptions = [
+  "The recorded task context file is present and readable.",
+  "The function's runtime, handler, timeout, memory size, description, and environment variables match the seeded configuration.",
+  "The function ARN and code hash are unchanged from the seeded function.",
+  "The live alias keeps its seeded ARN, targets the seeded stable version, and has no additional version routing weights.",
+  "Both the seeded stable and candidate published versions still exist.",
+  "The deployment group and CodeDeploy application keep their seeded identifiers, and the group uses the seeded CodeDeploy role.",
+  "The deployment group uses the CodeDeployDefault.LambdaCanary10Percent5Minutes configuration.",
+  "The deployment group uses the BLUE_GREEN deployment type with the WITH_TRAFFIC_CONTROL option.",
+  "Automatic rollback is enabled and includes both the DEPLOYMENT_FAILURE and DEPLOYMENT_STOP_ON_ALARM events.",
+  "Alarm monitoring on the deployment group is enabled, does not ignore alarm polling failures, and lists exactly the seeded alarm.",
+  "The seeded alarm exists and measures the AWS/Lambda Errors metric with the Sum statistic.",
+  "The alarm uses a 60-second period and a single evaluation period.",
+  "The alarm fires on one error, expressed either as greater than or equal to 1 or as greater than 0.",
+  "The alarm treats missing data as not breaching.",
+  "The alarm dimensions are exactly FunctionName for the function and Resource for the function's live alias.",
+  "The CodeDeploy role keeps its seeded role ID, and its trust policy has exactly one Allow statement, naming only codedeploy.amazonaws.com with sts:AssumeRole.",
+  "The CodeDeploy role has at least one inline or attached policy.",
+  "The role's policies contain unconditional Allow statements for lambda:UpdateAlias and lambda:GetAlias that list the live alias ARN itself as a resource.",
+  "The role's policies contain an unconditional Allow for cloudwatch:DescribeAlarms on the wildcard resource.",
+  "No Allow statement covering lambda:UpdateAlias or lambda:GetAlias names any resource other than the live alias ARN.",
+  "No unconditional Deny statement covers the required alias or alarm-read actions.",
+  "Every action in the role's Allow statements is one of cloudwatch:DescribeAlarms, lambda:UpdateAlias, lambda:GetAlias, lambda:GetProvisionedConcurrencyConfig, lambda:InvokeFunction, sns:Publish, s3:GetObject, or s3:GetObjectVersion, written without wildcards.",
+  "The Lambda execution role keeps its seeded role ID.",
+  "The function and the CodeDeploy role each carry the seeded CloudOpTask and Owner tags plus SecurityProfile=secure-canary-rollback-v1.",
+  "The Lambda execution role still carries the seeded CloudOpTask and Owner tags.",
+]
+keywords = ["aws", "lambda", "codedeploy", "cloudwatch", "iam", "deployment", "least-privilege"]
+extra_tools = []

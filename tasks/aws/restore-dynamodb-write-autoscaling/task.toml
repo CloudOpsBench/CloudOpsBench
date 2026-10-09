@@ -1,0 +1,10 @@
+[task]
+name = "restore-dynamodb-write-autoscaling"
+description = "Fix a provisioned DynamoDB table whose write capacity is stuck at 2 so that it auto-scales between 2 and 10 going forward."
+
+[metadata]
+initial_state_description = "A provisioned vera2-orders- table has its write capacity registered as an Application Auto Scaling target with minimum and maximum both set to 2, alongside a target-tracking policy on write utilization. A separate enabled EventBridge Scheduler schedule, with its own IAM role, re-registers that scalable target at minimum 2 and maximum 2 every 30 minutes starting one day after setup. Widening the range alone would therefore be reverted."
+outcome_description = "The write-capacity scalable target has minimum 2 and maximum 10, and no enabled schedule would re-register it with a lower maximum or a fixed capacity. The table must remain in provisioned billing mode and a target-tracking scaling policy must remain on its write capacity."
+criteria_descriptions = ["The table still exists and its billing mode is PROVISIONED.", "The table's write capacity is still a registered scalable target.", "The scalable target has MinCapacity 2 and MaxCapacity 10.", "Among schedules successfully read by the grader, no enabled EventBridge Scheduler schedule calls RegisterScalableTarget for this table with a MaxCapacity below 10.", "Among schedules successfully read by the grader, no enabled EventBridge Scheduler schedule calls RegisterScalableTarget for this table with MinCapacity equal to MaxCapacity.", "A TargetTrackingScaling policy still exists on the table's write capacity.", "The table, scalable targets, schedule listing and scaling policies can be read without an API error. Individual get_schedule ClientErrors are skipped rather than failing grading."]
+keywords = ["aws", "dynamodb", "application-autoscaling", "eventbridge-scheduler", "troubleshooting"]
+extra_tools = []

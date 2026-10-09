@@ -27,3 +27,4 @@ criteria_descriptions = [
   "The payouts team's secret still holds its original value and the same version stages.",
 ]
 keywords = ["secretsmanager", "ecs", "credential-rotation", "version-pinning"]
+extra_tools = []

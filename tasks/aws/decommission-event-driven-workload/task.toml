@@ -1,0 +1,10 @@
+[task]
+name = "decommission-event-driven-workload"
+description = "Fully dismantle the retired aeb-<region> event-driven workload so that no resource with that prefix remains anywhere."
+
+[metadata]
+initial_state_description = "Setup creates, in the home region, a disabled scheduled EventBridge rule, an SQS queue, and an SNS topic, all named with the aeb-<region> prefix. It also creates a second disabled EventBridge rule and a second SQS queue with the same names in a different region (us-west-2, or us-east-1 when the home region is us-west-2). The resources carry the prefix only in their names and have no tags, so they cannot be inventoried through tag-based lookups."
+outcome_description = "No EventBridge rule, SQS queue, or SNS topic carrying the aeb-<region> prefix remains in either the home region or the second region. A cleanup limited to the home region, or one that skips EventBridge rules, leaves resources behind and fails."
+criteria_descriptions = ["The seed state file written by setup is readable and contains the workload prefix.", "No EventBridge rule with the prefix in its name remains in the home region or the second region.", "No SQS queue whose name starts with the prefix remains in the home region or the second region.", "No SNS topic with the prefix in its ARN remains in the home region or the second region."]
+keywords = ["aws", "eventbridge", "sqs", "sns", "decommissioning", "multi-region"]
+extra_tools = []

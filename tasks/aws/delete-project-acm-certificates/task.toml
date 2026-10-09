@@ -1,0 +1,10 @@
+[task]
+name = "delete-project-acm-certificates"
+description = "Delete every vera2 ACM certificate in us-east-1 as part of decommissioning the project."
+
+[metadata]
+initial_state_description = "Three self-signed certificates with vera2- domain names are imported into ACM in us-east-1, none attached to any resource. Two use RSA-2048 keys and appear in a default certificate listing. The third, vera2-admin.internal.example, uses an RSA-4096 key, which a default ACM listing omits unless the key-type filter is widened."
+outcome_description = "None of the three seeded vera2 certificates exists in ACM any longer, including the RSA-4096 certificate that a default listing does not return. Nothing else is required to be preserved."
+criteria_descriptions = ["Each of the three seeded vera2 certificates, including the RSA-4096 one, can no longer be described in ACM (any result other than a not-found error counts as still present)."]
+keywords = ["aws", "acm", "decommissioning"]
+extra_tools = []

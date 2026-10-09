@@ -43,3 +43,6 @@ criteria_descriptions = [
   "the DataSync task analytics-export-daily is byte-for-byte unchanged from its seeded configuration",
   "every replication rule delivering to the compliance bucket is unchanged from its seeded configuration",
 ]
+
+keywords = ["aws", "s3", "firehose", "datasync", "replication", "athena", "migration", "multi-region"]
+extra_tools = []

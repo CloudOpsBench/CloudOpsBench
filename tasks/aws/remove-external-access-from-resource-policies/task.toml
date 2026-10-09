@@ -1,0 +1,10 @@
+[task]
+name = "remove-external-access-from-resource-policies"
+description = "Remove access granted to principals outside the account from the resource-based policies of every vera2 resource in us-east-1."
+
+[metadata]
+initial_state_description = "A vera2 SNS topic and a vera2 SQS queue each carry a policy allowing the wildcard principal with no condition. A vera2 Kinesis stream has a resource policy granting GetRecords to an external account, visible only through get-resource-policy. A vera2 HealthOmics sequence store has an S3 access policy with one statement for the own account and one for the same external account, visible only through get-s3-access-policy."
+outcome_description = "None of the four seeded resources has a policy statement that allows an unconditioned wildcard principal or an account other than the owner. All four resources still exist, and the sequence store's S3 access policy still grants the own account, so removing that whole policy is not accepted."
+criteria_descriptions = ["The seeded SNS topic, SQS queue, Kinesis stream and HealthOmics sequence store all still exist.", "The SNS topic policy has no Allow statement for a wildcard principal lacking an account-pinning condition or for a principal in another account.", "The SQS queue policy has no such Allow statement.", "The Kinesis stream resource policy has no such Allow statement.", "The HealthOmics sequence store S3 access policy has no such Allow statement.", "The sequence store S3 access policy still contains an Allow statement for a principal in the own account."]
+keywords = ["aws", "sns", "sqs", "kinesis", "healthomics", "security", "least-privilege"]
+extra_tools = []

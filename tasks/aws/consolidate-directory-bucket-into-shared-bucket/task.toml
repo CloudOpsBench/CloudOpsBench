@@ -1,0 +1,10 @@
+[task]
+name = "consolidate-directory-bucket-into-shared-bucket"
+description = "Consolidate the dataset in a vera2 S3 Express One Zone directory bucket into the shared general-purpose bucket under the same keys and leave the directory bucket empty."
+
+[metadata]
+initial_state_description = "A vera2 pilot directory bucket in use1-az4 holds two visible objects, data/rows.csv and data/manifest.json. It also holds an in-progress multipart upload for data/pilot-2026Q1.parquet with one uploaded 5 MiB part, which does not appear in an object listing and is part of the dataset. The vera2 shared bucket already contains shared/readme.txt, and an unrelated vera2 control bucket contains controls/leave.txt."
+outcome_description = "The shared bucket contains exactly its original object plus all three pilot objects under their original keys with matching bytes, which requires completing the unfinished multipart upload rather than aborting it. The pilot bucket is left with no objects and no in-progress multipart uploads. All three buckets still exist and the control bucket is unchanged."
+criteria_descriptions = ["The pilot directory bucket, the shared bucket and the control bucket all still exist.", "The pilot directory bucket contains no objects.", "The pilot directory bucket has no in-progress multipart uploads.", "The shared bucket's key set is exactly data/rows.csv, data/manifest.json, data/pilot-2026Q1.parquet and shared/readme.txt.", "Each of those four shared-bucket objects matches the recorded SHA-256 digest and size.", "The shared bucket has no in-progress multipart uploads.", "The control bucket contains only controls/leave.txt.", "The control bucket object matches its recorded SHA-256 digest and size."]
+keywords = ["aws", "s3", "s3-express", "data-migration", "decommissioning"]
+extra_tools = []

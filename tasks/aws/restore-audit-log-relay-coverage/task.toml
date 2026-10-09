@@ -36,3 +36,6 @@ criteria_descriptions = [
   "the vendor callback log group still has its seeded creation time, log class, KMS key, data protection status and tags, and still carries no subscription filter, so it was left otherwise untouched",
   "both audit Kinesis streams still exist with their seeded ARNs and creation timestamps, and the relay role still exists with its seeded RoleId, so none was rebuilt under the same name",
 ]
+
+keywords = ["aws", "cloudwatch-logs", "kinesis", "iam", "audit", "multi-region"]
+extra_tools = []

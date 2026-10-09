@@ -1,0 +1,19 @@
+[task]
+name = "consolidate-pilot-bucket-into-shared-bucket"
+description = "Move a pilot dataset from its S3 bucket into the team's shared bucket under the same keys and leave the source bucket empty."
+
+[metadata]
+initial_state_description = "Setup creates a `vera2-` source bucket ending in `-pilot` and a destination bucket ending in `-shared` in us-east-1. The source holds two completed objects under `data/`, and the shared bucket holds one existing readme object. The source also holds an in-progress multipart upload for a third `data/` key with one uploaded 5 MiB part, which does not appear in an object listing."
+outcome_description = "The shared bucket contains exactly the two source objects, the object assembled from the unfinished multipart upload, and its original readme, each with the recorded size and SHA-256. The source bucket has no objects and no in-progress multipart uploads, and both buckets still exist."
+criteria_descriptions = [
+    "The source bucket still exists.",
+    "The shared bucket still exists.",
+    "The source bucket contains no objects.",
+    "The source bucket has no in-progress multipart uploads.",
+    "The shared bucket's key set is exactly the three dataset keys plus the pre-existing readme key.",
+    "Each of those four objects can be read from the shared bucket.",
+    "Each of those four objects matches the recorded size and SHA-256, including the payload that was only an uploaded multipart part.",
+    "The shared bucket has no in-progress multipart uploads.",
+]
+keywords = ["aws", "s3", "data-migration", "decommissioning"]
+extra_tools = []

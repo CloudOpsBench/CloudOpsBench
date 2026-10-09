@@ -37,3 +37,6 @@ criteria_descriptions = [
   "the security SNS topic still exists, and its policy admits the rule that does the routing, conditions included",
   "an enabled EventBridge rule on the default bus targets the security topic and, per TestEventPattern, matches both a with-findings and a no-findings completed ECR image scan event for each of the four application repositories",
 ]
+
+keywords = ["aws", "ecr", "eventbridge", "sns", "security", "multi-region"]
+extra_tools = []

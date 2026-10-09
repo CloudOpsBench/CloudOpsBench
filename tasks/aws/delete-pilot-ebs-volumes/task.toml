@@ -1,0 +1,13 @@
+[task]
+name = "delete-pilot-ebs-volumes"
+description = "Delete the retired vera2 pilot's EBS volumes and leave other teams' volumes alone."
+
+[metadata]
+initial_state_description = "One available gp3 volume named with a vera2- prefix and tagged Project=vera2 exists in us-east-1. A Recycle Bin retention rule for EBS volumes tagged Project=vera2 holds deleted volumes for seven days, and setup confirms the rule is enforcing and then clears this run's test volumes from the Recycle Bin. A plain delete therefore moves the volume into the Recycle Bin, where it stays restorable and is no longer returned by the ordinary volume listing."
+outcome_description = "The pilot's volume is gone from the ordinary volume listing and is not held in the Recycle Bin, so nothing is left to restore. Deleting while the retention rule still covers the volume is not sufficient. Only the volume's state is graded; the state of other volumes is not checked."
+criteria_descriptions = [
+  "The pilot's volume is not returned by the ordinary volume lookup, or is returned only in the deleting state.",
+  "The pilot's volume does not appear in the account's Recycle Bin, polled for roughly 105 seconds while a retention rule for Project=vera2 volumes still exists and roughly 21 seconds otherwise.",
+]
+keywords = ["aws", "ec2", "ebs", "recycle-bin", "decommissioning"]
+extra_tools = []

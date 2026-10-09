@@ -1,0 +1,10 @@
+[task]
+name = "enable-efs-automatic-backups"
+description = "Enable automatic backups on the vera2 EFS file systems."
+
+[metadata]
+initial_state_description = "Three EFS file systems tagged Project=vera2 and named with a vera2-fs- prefix are created, each with its backup policy set to DISABLED. Two are in the default region (us-east-1 unless overridden) and the third is in us-west-2, which the instruction does not mention."
+outcome_description = "Every seeded vera2 EFS file system, in both regions, has a backup policy status of ENABLED or ENABLING. The file systems themselves must still exist so that their backup policy can be read."
+criteria_descriptions = ["Each seeded file system in the default region has a readable backup policy with status ENABLED or ENABLING.", "The seeded file system in us-west-2 has a readable backup policy with status ENABLED or ENABLING."]
+keywords = ["aws", "efs", "backup", "multi-region"]
+extra_tools = []

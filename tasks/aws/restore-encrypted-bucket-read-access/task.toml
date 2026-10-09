@@ -1,0 +1,10 @@
+[task]
+name = "restore-encrypted-bucket-read-access"
+description = "Diagnose why an application role gets AccessDenied reading the reports data bucket and restore its read access within the security team's constraints."
+
+[metadata]
+initial_state_description = "A ciph-data- bucket uses SSE-KMS default encryption with a customer managed key, and a ciph-archive- bucket uses default SSE-S3; each holds reports/q1.txt. The ciph-app- role has an inline policy granting identical S3 read access to both buckets but no kms:Decrypt on the key. The role's attached permissions boundary also allows only S3 read actions, so granting kms:Decrypt in the identity policy alone leaves the denial unchanged. A TICKET.md describing the incident and the constraints is placed in the workspace."
+outcome_description = "Both the role's inline identity policy and its permissions boundary allow kms:Decrypt scoped to the data bucket's key, so the role can read the encrypted object. The object stays encrypted with the original key, the boundary stays attached and is not opened with a broad wildcard grant, the existing S3 read access remains in both policies, and the archive bucket's encryption is untouched."
+criteria_descriptions = ["The data bucket object reports/q1.txt is still SSE-KMS encrypted.", "That object is still encrypted with the original customer managed key.", "An inline policy on the role has an Allow statement for kms:Decrypt (or kms:*) whose resource names the specific key rather than a bare wildcard.", "An inline policy on the role still allows s3:GetObject on the data bucket.", "The role still has a permissions boundary attached.", "The boundary's default policy version has an Allow statement for kms:Decrypt (or kms:*) whose resource names the specific key rather than a bare wildcard.", "The boundary has no Allow statement combining action * or kms:* with resource *.", "The boundary still allows s3:GetObject (or s3:*) on the data bucket.", "If the archive bucket reports a default encryption configuration, its algorithm is still AES256."]
+keywords = ["aws", "s3", "kms", "iam", "security", "least-privilege"]
+extra_tools = []

@@ -1,0 +1,10 @@
+[task]
+name = "delete-pilot-images"
+description = "Delete the finished vera2 pilot's images so that no vera2- image remains in the account."
+
+[metadata]
+initial_state_description = "Setup creates a 1 GiB EBS volume, a snapshot of it, and an AMI named with the vera2- prefix registered from that snapshot. It also creates an IAM role and an Amazon SageMaker image with the vera2- prefix, which is managed through the SageMaker API and is not returned by an EC2 image listing."
+outcome_description = "No self-owned AMI with a vera2- name is registered, and no SageMaker image with a vera2- name exists in the region. SageMaker image deletion is asynchronous, so the image must be fully gone rather than still deleting when the grader's wait ends."
+criteria_descriptions = ["No AMI owned by the account with a name matching vera2-* remains registered in the region.", "No SageMaker image whose name starts with vera2- remains in the region; an image still in DELETING status is polled for up to 90 seconds and must disappear, and an image in any other status fails immediately."]
+keywords = ["aws", "ec2", "sagemaker", "decommissioning", "resource-discovery"]
+extra_tools = []

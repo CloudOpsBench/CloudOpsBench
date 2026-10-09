@@ -1,0 +1,16 @@
+[task]
+name = "decommission-data-pipeline"
+description = "Fully decommission the deprecated adt- data pipeline by removing every resource that carries its name prefix."
+
+[metadata]
+initial_state_description = "A small pipeline is built by hand with a per-run adt- name prefix and no tags, so it cannot be enumerated through a tag inventory. The home region holds a DynamoDB table, a Kinesis stream, an empty ECR repository, and an SQS queue. A second region holds another DynamoDB table and Kinesis stream with the same names, which a single-region sweep does not find."
+outcome_description = "No active DynamoDB table or Kinesis stream, and no ECR repository or SQS queue, carrying the pipeline's prefix remains in either the home region or the second region. Tables and streams that are already deleting count as removed. The instruction also asks that nothing outside the adt- prefix be touched, but only the removal is graded."
+criteria_descriptions = [
+  "The recorded seed state is readable and contains the pipeline's name prefix.",
+  "No DynamoDB table whose name contains the prefix is still in ACTIVE status in either region.",
+  "No Kinesis stream whose name contains the prefix is still in ACTIVE status in either region.",
+  "No ECR repository whose name contains the prefix exists in either region.",
+  "No SQS queue whose name starts with the prefix is listed in either region.",
+]
+keywords = ["aws", "dynamodb", "kinesis", "ecr", "sqs", "decommissioning", "multi-region"]
+extra_tools = []

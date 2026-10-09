@@ -1,0 +1,19 @@
+[task]
+name = "decommission-customer-portal"
+description = "Remove everything belonging to the retired customer portal from the account while keeping the billing workload intact."
+
+[metadata]
+initial_state_description = "The customer portal owns an SQS queue, an SNS topic, and a CloudWatch Logs log group, all named with a vera2 portal prefix and a per-run suffix. The billing workload owns a parallel queue, topic, and log group under its own identifier. Each workload also has an AWS Well-Architected Tool workload review; the portal's review is untagged, does not appear in the resource tagging inventory, and is owned by a portal on-call address containing the same suffix."
+outcome_description = "The portal's queue, topic, and log group are gone, and no Well-Architected workload that references the portal's identifier remains. The billing workload's queue, topic, log group, and Well-Architected review must all still exist."
+criteria_descriptions = [
+  "The portal's SQS queue no longer appears in the queue listing, allowing up to 90 seconds for an in-flight deletion.",
+  "The portal's SNS topic no longer exists.",
+  "The portal's log group no longer exists.",
+  "No Well-Architected workload whose full definition contains the portal's identifier remains.",
+  "The billing workload's Well-Architected review still exists under its seeded name.",
+  "The billing workload's SQS queue still exists.",
+  "The billing workload's SNS topic still exists.",
+  "The billing workload's log group still exists.",
+]
+keywords = ["aws", "sqs", "sns", "cloudwatch-logs", "well-architected", "decommissioning"]
+extra_tools = []

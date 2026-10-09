@@ -1,8 +1,0 @@
-id     = "ext_archit_decommission_analytics"
-name   = "Full decommission (AWS): orphans hide cross-region and in Athena workgroups"
-cloud  = "aws"
-source = "archit_decommission_analytics.zip"
-
-# prompt uses {account_id} only; the per-run prefix is baked to a fixed literal
-# (aaq-7c21) and there are no other braces, so opt into substitution.
-prompt_placeholders = true
