@@ -88,9 +88,9 @@ Three tasks (`promote-lambda-live-alias`, `tighten-kinesis-resource-policy`,
 
 Setup, grader, and solution scripts were imported without behavioral changes. Source import
 and static validity do not imply that a task is executable end-to-end: the 42 most recently
-added tasks have not yet been run with oracle and negative controls. Two tasks ship an
-`environment/lifecycle/assets/agent_policy.json` describing restricted agent permissions,
-which the runner does not currently apply.
+added tasks have not yet been run with oracle and negative controls. No task ships an
+agent permission policy: the runner gives the agent the same identity as setup and the
+grader.
 
 ## Execution and grading
 
