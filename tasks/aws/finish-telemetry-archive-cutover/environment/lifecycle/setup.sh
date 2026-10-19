@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Seeds a retired and a replacement telemetry archive bucket plus the writers that still
-# deliver into the retired one, and records the state in seed_state.json.
+# Seeds a retired and a replacement telemetry archive bucket, plus the writers that
+# deliver into the retired one: S3 replication in two regions, a Firehose stream, a
+# DataSync task, a VPC flow log, S3 access logging and an Athena workgroup. The
+# seeded state is recorded in seed_state.json for the checker.
 set -euo pipefail
 python3 - <<'PY'
 import boto3, json, os, time, uuid
@@ -130,17 +132,18 @@ repl_arn = make_role(REPL_ROLE, "s3.amazonaws.com")
 fh_arn = make_role(FH_ROLE, "firehose.amazonaws.com")
 ds_arn = make_role(DS_ROLE, "datasync.amazonaws.com")
 
-# History in the retired archive. The checker verifies it stays intact.
+# The retired archive already holds history. It is under audit hold and must survive intact.
 LEGACY_KEYS = ["raw/2026/07/%02d/batch.json" % i for i in range(1, 6)] + \
               ["partner/2026/07/manifest-%d.csv" % i for i in range(1, 4)]
 for k in LEGACY_KEYS:
     s3.put_object(Bucket=LEGACY, Key=k, Body=b'{"telemetry": "archived"}')
-# Copy the same history into the replacement so it looks live.
+# The replacement already looks live: copied history sits under both prefixes.
 for k in LEGACY_KEYS:
     s3.put_object(Bucket=NEW, Key=k, Body=b'{"telemetry": "archived"}')
 
 time.sleep(12)  # IAM propagation before S3/DataSync/Firehose validate the roles
 
+# replication on the in-region ingest bucket
 INGEST_REPL = {
     "Role": repl_arn,
     "Rules": [
@@ -171,6 +174,7 @@ time.sleep(10)
 
 s3.put_bucket_replication(Bucket=INGEST, ReplicationConfiguration=INGEST_REPL)
 
+# replication on the ingest bucket in the other region
 EDGE_REPL = {
     "Role": repl_arn,
     "Rules": [
@@ -187,6 +191,7 @@ EDGE_REPL = {
 }
 s3e.put_bucket_replication(Bucket=EDGE_INGEST, ReplicationConfiguration=EDGE_REPL)
 
+# the raw telemetry delivery stream
 fh.create_delivery_stream(
     DeliveryStreamName="telemetry-raw-stream",
     DeliveryStreamType="DirectPut",
@@ -198,6 +203,7 @@ fh.create_delivery_stream(
         "CompressionFormat": "UNCOMPRESSED",
     })
 
+# the nightly partner sync
 SCHEDULE = "cron(0 3 * * ? *)"
 EXCLUDES = [{"FilterType": "SIMPLE_PATTERN", "Value": "/staging/*|*.partial"}]
 
@@ -220,7 +226,7 @@ partner_task = ds.create_task(
     Name="partner-drop-nightly", Schedule={"ScheduleExpression": SCHEDULE},
     Excludes=EXCLUDES)["TaskArn"]
 
-# Decoy: already writes to the replacement and must stay unchanged.
+# already cut over, and not part of the work: leave alone
 an_src = location(ds, INGEST, "/analytics/")
 an_dst = location(ds, NEW, "/analytics/")
 analytics_task = ds.create_task(
@@ -228,6 +234,7 @@ analytics_task = ds.create_task(
     Name="analytics-export-daily", Schedule={"ScheduleExpression": "cron(0 5 * * ? *)"},
     Excludes=[{"FilterType": "SIMPLE_PATTERN", "Value": "*.tmp"}])["TaskArn"]
 
+# a flow log in the other region, writing straight into the retired bucket
 ec2e = boto3.client("ec2", region_name=EDGE)
 vpc = ec2e.create_vpc(CidrBlock="10.77.0.0/16")["Vpc"]["VpcId"]
 ec2e.create_tags(Resources=[vpc], Tags=[
@@ -256,6 +263,7 @@ for page in s3.get_paginator("list_object_versions").paginate(
     if objs:
         s3.delete_objects(Bucket=LEGACY, Delete={"Objects": objs})
 
+# an ad-hoc query workgroup parking its results in the retired bucket
 ath = boto3.client("athena", region_name=EDGE)
 ATHENA_WG = "telemetry-adhoc"
 ATHENA_PREFIX = "athena-results/"
@@ -269,11 +277,12 @@ ath.create_work_group(
     Configuration={"ResultConfiguration": {
         "OutputLocation": "s3://%s/%s" % (LEGACY, ATHENA_PREFIX)}})
 
+# server access logging on the ingest bucket
 ACCESS_PREFIX = "access-logs/"
 s3.put_bucket_logging(Bucket=INGEST, BucketLoggingStatus={"LoggingEnabled": {
     "TargetBucket": LEGACY, "TargetPrefix": ACCESS_PREFIX}})
 
-# Parameter and tags claiming the cutover is complete.
+# the completion evidence
 ssm.put_parameter(
     Name="/platform/telemetry/archive-cutover", Overwrite=True, Type="String",
     Value=json.dumps({

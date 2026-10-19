@@ -234,6 +234,7 @@ for name in (LURE_STREAM, REAL_STREAM):
         time.sleep(5)
 
 
+# Narrow both delivery roles to the archive bucket.
 for role_name in (FH_ARCHIVE_ROLE, FH_CURATED_ROLE):
     iam.put_role_policy(RoleName=role_name, PolicyName="inline",
                         PolicyDocument=json.dumps(delivery_policy([ARCHIVE])))

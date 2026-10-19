@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates App=nightbell SNS topics in two regions and CloudWatch metric and
+# composite alarms with that tag, some without an alarm action, plus an alarm
+# tagged for another app. Records the expected state in seed_state.json.
 set -euo pipefail
 python3 <<'PY'
 import json, os, random, subprocess, sys

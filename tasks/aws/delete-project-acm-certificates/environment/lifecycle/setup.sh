@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Imports three self-signed vera2 certificates into ACM (two RSA-2048, one RSA-4096).
+# Imports three self-signed vera2 certificates into ACM, two RSA-2048 and one
+# RSA-4096, and records their ARNs in seed_state.json.
 set -euo pipefail
 REGION="us-east-1"
 WORK="$(mktemp -d)"
@@ -23,7 +24,7 @@ imp() {
 }
 A1="$(imp "$WORK/d1.crt" "$WORK/d1.key")"   # vera2-checkout  RSA-2048 (visible)
 A2="$(imp "$WORK/d2.crt" "$WORK/d2.key")"   # vera2-payments  RSA-2048 (visible)
-AH="$(imp "$WORK/h.crt"  "$WORK/h.key")"    # vera2-admin     RSA-4096 (omitted from default list)
+AH="$(imp "$WORK/h.crt"  "$WORK/h.key")"    # vera2-admin     RSA-4096 (hidden by default list)
 
 python3 - "$REGION" "$A1" "$A2" "$AH" <<'PY'
 import json,sys

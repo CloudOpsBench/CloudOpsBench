@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Deploys a Lambda with a `live` alias via Terraform, then creates an SQS
+# event-source mapping outside Terraform that is pinned to the current numbered
+# version rather than the alias. The old CodeSha256 is stored in SSM at
+# /vera/<func>/old-sha for the checker.
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
@@ -94,7 +98,7 @@ terraform -chdir="$WS" init -input=false -no-color >/dev/null
 terraform -chdir="$WS" apply -auto-approve -input=false -no-color >/dev/null
 echo "  Terraform manages: ${FUNC} (old code published) + live alias"
 
-# SQS mapping pinned to the numbered version, created outside Terraform.
+# SQS queue and event-source mapping pinned to the numbered version, outside Terraform.
 QURL=""
 for _ in $(seq 1 40); do
   if QURL=$(aws sqs create-queue --queue-name "$QNAME" --query QueueUrl --output text 2>/dev/null); then break; fi
@@ -125,6 +129,7 @@ for _ in $(seq 1 60); do
 done
 echo "  Out-of-band: SQS ESM pinned to ${FUNC}:${OLD_VER} (hidden; not in terraform)"
 
+# Replace the handler with the new build that the task asks to roll out.
 cat > "${WS}/index.py" <<'EOF'
 def handler(event, context):
     # NEW order-processing handler being rolled out.
@@ -138,7 +143,7 @@ echo "==> setup complete"
 echo "    Agent task: publish the new code and cut the live alias to it — without"
 echo "    leaving anything that consumes this function stranded on the old version."
 
-# Checker-only seed state. Keep it out of the agent workspace.
+# Private seed state for the checker; do not copy into the agent workspace.
 python3 - <<'SEED_STATE'
 import json, os
 json.dump({"region": os.environ["AWS_REGION"]}, open("seed_state.json", "w"), indent=2)

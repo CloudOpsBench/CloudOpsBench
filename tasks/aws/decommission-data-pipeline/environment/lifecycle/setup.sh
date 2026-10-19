@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Creates an untagged data pipeline named with a per-run `adt-<hex>` prefix. The
-# home region gets a DynamoDB table, Kinesis stream, ECR repository and SQS queue,
-# and a second region gets a table and stream. Writes seed_state.json.
+# Creates a small data pipeline whose resources share a per-run `adt-<hex>` name
+# prefix and carry no tags: a DynamoDB table, Kinesis stream, ECR repository and
+# SQS queue in the home region, and a table and stream in a second region.
+# Records the names and regions in seed_state.json.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text --region "$AWS_REGION")}"
@@ -17,6 +18,7 @@ W_TABLE="${PREFIX}-table"; W_STREAM="${PREFIX}-stream"
 
 echo "==> setup $TASK_TAG (account $ACCOUNT_ID, home $PRIMARY, prefix $PREFIX)"
 
+# Home region resources.
 aws dynamodb create-table --table-name "$TABLE" \
   --attribute-definitions AttributeName=id,AttributeType=S \
   --key-schema AttributeName=id,KeyType=HASH \
@@ -28,13 +30,15 @@ aws ecr create-repository --repository-name "$REPO" --region "$PRIMARY" >/dev/nu
 
 QUEUE_URL="$(aws sqs create-queue --queue-name "$QUEUE" --region "$PRIMARY" --query 'QueueUrl' --output text)"
 
+# Second region resources.
 aws dynamodb create-table --table-name "$W_TABLE" \
   --attribute-definitions AttributeName=id,AttributeType=S \
   --key-schema AttributeName=id,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST --region "$SECONDARY" >/dev/null
 aws kinesis create-stream --stream-name "$W_STREAM" --shard-count 1 --region "$SECONDARY" >/dev/null
 
-# A table still in CREATING rejects delete-table, so wait for ACTIVE.
+# Wait for the tables and streams to become ACTIVE; a table that is still
+# CREATING rejects delete-table.
 aws dynamodb wait table-exists --table-name "$TABLE" --region "$PRIMARY" 2>/dev/null || true
 aws dynamodb wait table-exists --table-name "$W_TABLE" --region "$SECONDARY" 2>/dev/null || true
 aws kinesis wait stream-exists --stream-name "$STREAM" --region "$PRIMARY" 2>/dev/null || true

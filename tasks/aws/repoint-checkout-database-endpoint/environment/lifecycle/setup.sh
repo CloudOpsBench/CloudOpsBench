@@ -6,6 +6,7 @@ REGION="${AWS_REGION:-us-east-1}"
 SUF="${RANDOM}${RANDOM}"
 PARAM="/vera2/${SUF}/checkout/db-endpoint"
 
+# Remove any stale parameter with the same name.
 aws ssm delete-parameter --name "$PARAM" --region "$REGION" >/dev/null 2>&1 || true
 
 aws ssm put-parameter --name "$PARAM" --type String \

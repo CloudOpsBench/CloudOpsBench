@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Creates two general-purpose buckets and one S3 Express One Zone directory bucket, all vera2-.
+# Creates two general-purpose buckets and one S3 Express One Zone directory
+# bucket with the vera2- prefix, and records their names in seed_state.json.
 set -euo pipefail
 REGION="us-east-1"
 AZID="use1-az4"

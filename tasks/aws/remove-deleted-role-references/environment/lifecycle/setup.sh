@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates the fleet IAM roles, sets the telemetry role as the account's Greengrass
+# service role, then deletes that role so the association and an inline policy on
+# the ops role still name it. Baselines are written to seed_state.json.
 set -uo pipefail
 export AWS_PAGER=""
 export AWS_DEFAULT_REGION="${AWS_REGION:-us-east-1}"
@@ -54,7 +57,7 @@ def drop_role(name):
     soft(iam.delete_role, RoleName=name)
 
 soft(gg.disassociate_service_role_from_account)
-for _n in (KEEP, RETIRED, OPS):
+for _n in (KEEP, RETIRED, OPS):  # only this task's own roles
     drop_role(_n)
 note("prior state cleared")
 
@@ -65,6 +68,7 @@ def make_role(name):
     return arn
 
 def wait_role(name, want, floor):
+    """Poll instead of sleeping a fixed span: usually a second or two, and it gives up on the budget."""
     while left() > floor:
         if bool(soft(iam.get_role, RoleName=name)) == want:
             return True
@@ -113,9 +117,9 @@ iam.put_role_policy(RoleName=OPS, PolicyName=OPS_POLICY, PolicyDocument=json.dum
 wait_role(OPS, True, 30)
 note("%s seeded with an inline policy naming the retired role" % OPS)
 
-seeded_at = time.time()  # roles created before this count as pre-existing
+seeded_at = time.time()  # stamped last
 
-keep_trust, keep_inline = None, {}
+keep_trust, keep_inline = None, {}  # baselines for the unchanged check
 kr = soft(iam.get_role, RoleName=KEEP)
 if kr:
     keep_trust = kr["Role"]["AssumeRolePolicyDocument"]
@@ -123,7 +127,7 @@ if kr:
         pd = soft(iam.get_role_policy, RoleName=KEEP, PolicyName=p)
         if pd:
             keep_inline[p] = pd["PolicyDocument"]
-keep_attached = []
+keep_attached = []  # the rest of the keep-role's mutable surface
 for pg in iam.get_paginator("list_attached_role_policies").paginate(RoleName=KEEP):
     keep_attached += [p["PolicyArn"] for p in pg.get("AttachedPolicies", [])]
 _kr = (kr or {}).get("Role", {})

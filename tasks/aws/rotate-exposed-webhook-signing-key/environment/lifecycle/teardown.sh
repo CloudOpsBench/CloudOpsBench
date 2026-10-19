@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Best-effort removal of everything setup.sh created. Never fails.
+# Best-effort removal of the secrets, task definitions and role created by setup.sh.
+# Never fails.
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates a CloudWatch alarm with Threshold=1000 and an EventBridge Scheduler
+# schedule that rewrites the alarm with the same definition every 30 minutes.
+# The seeded state is recorded in seed_state.json for the checker.
 set -euo pipefail
 
 python3 - <<'PY'

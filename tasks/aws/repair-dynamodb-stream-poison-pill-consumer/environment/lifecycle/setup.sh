@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Creates a DynamoDB source table with a stream, processed and receipt tables, a
+# failure-archive bucket and a Lambda stream consumer whose handler mishandles
+# poison and REMOVE records. Records resource identifiers and hashes of the
+# protected configuration in seed_state.json.
 set -euo pipefail
 export AWS_PAGER=""
 

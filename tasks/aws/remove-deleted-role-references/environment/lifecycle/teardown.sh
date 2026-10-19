@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Removes the Greengrass service-role association and the vera2 fleet roles.
 set -uo pipefail
 export AWS_PAGER=""
 export AWS_DEFAULT_REGION="${AWS_REGION:-us-east-1}"

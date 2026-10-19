@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Seeds an evidence pipeline whose sources have no working route to the
-# archiver queue. Writes seed_state.json.
+# Seeds an S3 evidence bucket, archiver, retention and dead-letter queues, a
+# custom event bus with capture, recorder and retention rules, an SNS alert
+# topic and a Step Functions sealer. Several sources are seeded without a
+# working route to the archiver queue. Writes seed_state.json.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
@@ -72,10 +74,12 @@ policy = {
 }
 print(json.dumps({"Policy": json.dumps(policy)}))
 PY
-# A policy naming a new role can fail with MalformedPolicyDocument until IAM propagates.
+# IAM role propagation: a resource policy naming a brand-new role can be
+# rejected with MalformedPolicyDocument until the principal resolves.
 retry aws sqs set-queue-attributes --queue-url "$ARCH_URL" --attributes file://arch-attrs.json
 rm -f arch-attrs.json
 
+# Identity policy letting the ingest role send to the archiver queue.
 python3 - "$ARCH_ARN" > ingest-perm.json <<'PY'
 import json
 import sys
@@ -87,6 +91,7 @@ retry aws iam put-role-policy --role-name "$ROLE" --policy-name send-to-archiver
   --policy-document file://ingest-perm.json
 rm -f ingest-perm.json
 
+# Retention worker queue policy allowing EventBridge delivery.
 python3 - "$RET_ARN" > ret-attrs.json <<'PY'
 import json
 import sys
@@ -116,7 +121,8 @@ retry aws events put-targets --rule "$CAP_RULE" --event-bus-name "$BUS" \
   --targets "Id=archiver,Arn=$ARCH_ARN" >/dev/null
 
 TOPIC_ARN=$(retry aws sns create-topic --name "$ALERT_TOPIC" --query TopicArn --output text)
-# The alert topic gets no subscription and no queue-policy grant.
+# Label the alert topic with what it feeds. It is left without a subscription
+# or a queue-policy grant.
 retry aws sns set-topic-attributes --topic-arn "$TOPIC_ARN" \
   --attribute-name DisplayName --attribute-value "Evidence intake alerts (compliance archive source)"
 retry aws sns tag-resource --resource-arn "$TOPIC_ARN" \

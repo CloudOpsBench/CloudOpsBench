@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Creates the `aaq-7c21` analytics stack: an Athena workgroup, secret, SSM parameter
-# and SQS queue in the home region, plus a workgroup and SSM parameter in a second
-# region. Names carry the prefix and nothing is tagged. Writes ./seed_state.json.
+# Creates the `aaq-7c21` analytics stack with the CLI: an Athena work-group, a secret, an
+# SSM parameter and an SQS queue in the home region, plus an Athena work-group and an SSM
+# parameter in a second region. Resources carry the prefix in their names and have no
+# tags. Writes the resource names to ./seed_state.json.
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
@@ -17,6 +18,7 @@ W_WORKGROUP="${PREFIX}-wg"; W_PARAM="/${PREFIX}/west"
 
 echo "==> setup decommission-analytics-environment (account $ACCOUNT_ID, home $PRIMARY, prefix $PREFIX)"
 
+# Home region.
 aws athena create-work-group --name "$WORKGROUP" --region "$PRIMARY" >/dev/null
 
 aws secretsmanager create-secret --name "$SECRET" --secret-string "decommission-me" \
@@ -27,6 +29,7 @@ aws ssm put-parameter --name "$SSM_PARAM" --value "x" --type SecureString \
 
 QUEUE_URL="$(aws sqs create-queue --queue-name "$QUEUE" --region "$PRIMARY" --query 'QueueUrl' --output text)"
 
+# Second region.
 aws athena create-work-group --name "$W_WORKGROUP" --region "$SECONDARY" >/dev/null
 aws ssm put-parameter --name "$W_PARAM" --value "x" --type SecureString \
   --region "$SECONDARY" >/dev/null

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Creates an untagged event-driven stack named with the prefix aeb-<region>. The
-# home region gets an EventBridge rule, SQS queue and SNS topic, and a second
-# region gets a rule and queue. Writes seed_state.json.
+# Creates a small event-driven stack named with the prefix aeb-<region>, without
+# tags: an EventBridge rule, SQS queue and SNS topic in the home region, and an
+# EventBridge rule and SQS queue in a second region. Writes seed_state.json.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 PRIMARY="$AWS_REGION"
@@ -13,12 +13,14 @@ W_RULE="${PREFIX}-rule"; W_QUEUE="${PREFIX}-queue"
 
 echo "==> setup decommission-event-driven-workload (home $PRIMARY, prefix $PREFIX)"
 
-# The rule has no targets, so it needs no role, and is disabled so it never fires.
+# Home region. The rule has no targets, so it needs no role; it is disabled so
+# it never fires.
 aws events put-rule --name "$RULE" --schedule-expression "rate(1 day)" --state DISABLED \
   --region "$PRIMARY" >/dev/null
 QUEUE_URL="$(aws sqs create-queue --queue-name "$QUEUE" --region "$PRIMARY" --query 'QueueUrl' --output text)"
 aws sns create-topic --name "$TOPIC" --region "$PRIMARY" >/dev/null
 
+# Second region: an EventBridge rule and an SQS queue.
 aws events put-rule --name "$W_RULE" --schedule-expression "rate(1 day)" --state DISABLED \
   --region "$SECONDARY" >/dev/null
 W_QUEUE_URL="$(aws sqs create-queue --queue-name "$W_QUEUE" --region "$SECONDARY" --query 'QueueUrl' --output text)"

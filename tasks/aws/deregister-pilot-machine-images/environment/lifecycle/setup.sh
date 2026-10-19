@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Registers a Project=vera2 AMI and a Recycle Bin rule covering that tag. A canary image
-# proves the rule is enforcing, then the bin is emptied.
+# Registers an AMI tagged Project=vera2 from a small snapshot and creates a
+# Recycle Bin retention rule covering images with that tag. A throwaway image is
+# deregistered first to confirm the rule is enforcing, then the bin is emptied.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="$(date +%s | tail -c 5)${RANDOM}"
@@ -87,7 +88,8 @@ for _ in $(seq 1 8); do
   done
   sleep 4
 done
-# $LEFT is stale after the final pass, so re-read it.
+# The loop samples the bin before each cleanup pass, so $LEFT is stale after the
+# final pass. Re-read it here.
 LEFT=$(aws ec2 list-images-in-recycle-bin --region "$REGION" --query 'length(Images)' --output text 2>/dev/null || echo 0)
 [ "$LEFT" = "0" ] || { echo "FATAL: canary left $LEFT image(s) in the bin — that would teach the solver the answer"; exit 1; }
 

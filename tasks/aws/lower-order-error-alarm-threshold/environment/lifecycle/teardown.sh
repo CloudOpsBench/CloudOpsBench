@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Deletes the vera2-cw-pin-* schedules and roles and the
+# vera2-high-order-errors-* alarms.
 set -euo pipefail
 
 python3 - <<'PY'
@@ -20,6 +22,7 @@ def swallow(fn):
         pass
 
 
+# schedules
 token = None
 while True:
     kw = {"NextToken": token} if token else {}
@@ -31,12 +34,14 @@ while True:
     if not token:
         break
 
+# roles
 for r in iam.list_roles().get("Roles", []):
     if r["RoleName"].startswith("vera2-cw-pin-role-"):
         for p in iam.list_role_policies(RoleName=r["RoleName"]).get("PolicyNames", []):
             swallow(lambda r=r, p=p: iam.delete_role_policy(RoleName=r["RoleName"], PolicyName=p))
         swallow(lambda r=r: iam.delete_role(RoleName=r["RoleName"]))
 
+# alarms
 token = None
 while True:
     kw = {"NextToken": token} if token else {}

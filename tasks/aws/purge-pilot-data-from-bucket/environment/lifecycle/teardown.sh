@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deletes every vera2- bucket with its objects and in-progress multipart uploads.
 set -uo pipefail
 for B in $(aws s3api list-buckets --query "Buckets[?starts_with(Name,'vera2-')].Name" --output text 2>/dev/null | tr '\t' '\n'); do
   [ -n "$B" ] && [ "$B" != "None" ] || continue

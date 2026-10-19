@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Creates a bucket with two objects and an in-progress multipart upload holding
+# one 5 MB part, then confirms the upload is listed by list-multipart-uploads
+# and not by list-objects-v2.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 SUF="$(date +%s | tail -c 5)${RANDOM}"
