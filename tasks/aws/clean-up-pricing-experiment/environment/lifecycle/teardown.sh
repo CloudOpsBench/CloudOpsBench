@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Tears down the pricing experiment fixture. Access points are removed before
-# the bucket, multipart uploads are aborted so the bucket can be deleted, and
-# secrets are force-deleted so the next setup can recreate them. Tolerates
-# resources that are already gone.
+# Tears down the pricing experiment fixture. Access points go before the bucket,
+# multipart uploads are aborted so the bucket can be deleted, and secrets are
+# force-deleted so the next setup can recreate them.
 set -euo pipefail
 
 _ts() { date -u +'%Y-%m-%dT%H:%M:%SZ'; }

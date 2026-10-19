@@ -68,7 +68,6 @@ def poll_for_marker(marker, deadline_s=150):
     return None
 
 
-# A message using the producer's lowercase priority value must reach the queue.
 urgent_marker = "urgent-%s" % uuid.uuid4().hex
 publish(priority="urgent", marker=urgent_marker)
 item = poll_for_marker(urgent_marker)
@@ -76,7 +75,6 @@ ck.require(item is not None,
            "a fresh urgent order event was published but never reached the "
            "escalation queue; something is still blocking delivery")
 
-# The ComplianceAudit clause in the same FilterPolicy must still route.
 compliance_marker = "compliance-%s" % uuid.uuid4().hex
 publish(category="ComplianceAudit", marker=compliance_marker)
 item = poll_for_marker(compliance_marker)

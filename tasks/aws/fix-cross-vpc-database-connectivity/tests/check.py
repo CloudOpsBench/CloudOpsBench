@@ -1,11 +1,3 @@
-"""Check that prod-vpc can reach the shared-vpc database over the peering connection.
-
-Passes when prod-custom-rt has an active route to shared-vpc and shared-custom-rt
-has an active route to prod-vpc, both via the peering connection, and shared-rds-sg
-allows inbound TCP 5432 from the application-tier security group or the prod-vpc
-CIDR. The peering connection must still be active and the subnets must still be
-associated with their custom route tables. Reads ./seed_state.json.
-"""
 import checkkit as ck
 
 seed = ck.seed()
@@ -19,7 +11,6 @@ shared_rds_sg_id = seed["shared_rds_sg_id"]
 prod_vpc_cidr = "10.0.0.0/16"
 shared_vpc_cidr = "172.16.0.0/16"
 
-# The original peering connection must still be active.
 peering = ec2.describe_vpc_peering_connections(
     VpcPeeringConnectionIds=[peering_id])["VpcPeeringConnections"][0]
 ck.require(peering["Status"]["Code"] == "active",
@@ -69,7 +60,6 @@ ck.require(allows_5432(rds_sg),
            "security group (prod-web-sg) or from 10.0.0.0/16 - the database is still "
            "unreachable from prod")
 
-# Subnets must still be associated with their custom route tables.
 def subnet_ids(name):
     return [s["SubnetId"] for s in ec2.describe_subnets(
         Filters=[{"Name": "tag:Name", "Values": [name]}])["Subnets"]]

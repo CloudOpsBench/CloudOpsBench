@@ -6,7 +6,6 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 python3 <<'SEEDPY'
-"""Seeds the relay webhook signing key, its regional copy, and the task definitions that read it."""
 import json
 import os
 import secrets as pysecrets

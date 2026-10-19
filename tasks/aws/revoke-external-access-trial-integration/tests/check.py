@@ -42,7 +42,6 @@ def _is_public(statements):
 
 exposed = []
 
-# Serverless Application Repository application policy.
 try:
     app_id = seed.get("sar_app_id")
     if app_id:
@@ -52,7 +51,6 @@ try:
 except Exception:
     pass
 
-# SNS topic policy.
 try:
     topic_arn = seed.get("sns_topic_arn")
     if topic_arn:

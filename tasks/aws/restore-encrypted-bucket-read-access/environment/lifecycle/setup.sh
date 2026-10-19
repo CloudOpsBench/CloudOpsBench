@@ -54,7 +54,6 @@ echo "reporting dataset v1" > /tmp/obj.txt
 aws s3 cp /tmp/obj.txt "s3://${DATA_BUCKET}/reports/q1.txt"
 aws s3 cp /tmp/obj.txt "s3://${ARCHIVE_BUCKET}/reports/q1.txt"
 
-# Permissions boundary that allows S3 read only.
 cat > /tmp/boundary.json <<EOF
 {
   "Version": "2012-10-17",
@@ -78,7 +77,6 @@ BOUNDARY_ARN="$(aws iam create-policy --policy-name "${BOUNDARY_POLICY}" \
   --query 'Policy.Arn' --output text)"
 echo "Boundary: ${BOUNDARY_ARN}"
 
-# App role with the boundary attached and an identity policy that allows S3 read only.
 cat > /tmp/trust.json <<'EOF'
 {
   "Version": "2012-10-17",
@@ -115,7 +113,6 @@ EOF
 aws iam put-role-policy --role-name "${APP_ROLE}" --policy-name "app-read-access" \
   --policy-document file:///tmp/identity.json
 
-# State file read by the checker.
 cat > seed_state.json <<EOF
 {
   "app_role": "${APP_ROLE}",

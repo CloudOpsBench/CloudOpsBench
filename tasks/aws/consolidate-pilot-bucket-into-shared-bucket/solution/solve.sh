@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Completes the in-progress multipart upload in the pilot bucket, copies every
-# pilot object to the shared bucket, verifies each copy by SHA-256, and then
-# deletes the source objects.
+# pilot object to the shared bucket, verifies each copy by SHA-256, then deletes
+# the source objects.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
@@ -83,7 +83,7 @@ for upload in uploads:
         MultipartUpload={"Parts": parts},
     )
 
-# Copy first, verify the complete bytes at the destination, and only then remove the source object.
+# Delete each source object only after its copy is verified.
 for item in list(objects(source)):
     key = item["Key"]
     expected = digest(source, key)

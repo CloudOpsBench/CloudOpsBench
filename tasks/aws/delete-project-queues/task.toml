@@ -1,10 +1,13 @@
 [task]
 name = "delete-project-queues"
-description = "Delete every queue belonging to the retired vera2 project so that no vera2- queue remains in the account."
+description = "Delete every queue of the retired vera2 project so no vera2- queue remains in the account"
 
 [metadata]
-initial_state_description = "Setup creates two SQS queues named with the vera2- prefix, which are the queues an SQS listing shows. It also creates an AWS Elemental MediaConvert queue with the same vera2- prefix, which is listed only by the MediaConvert API and never by an SQS queue listing."
-outcome_description = "No queue whose name starts with vera2- remains in the region, in either MediaConvert or SQS. A cleanup that stops after the SQS queues leaves the MediaConvert queue behind and fails."
-criteria_descriptions = ["No MediaConvert queue whose name starts with vera2- remains in the region.", "No SQS queue whose name starts with vera2- remains in the region, allowing up to about a minute for SQS deletion to become visible in listings."]
+initial_state_description = "Setup creates two SQS queues and one AWS Elemental MediaConvert queue, all named with the vera2- prefix. The MediaConvert queue appears only in the MediaConvert API, not in SQS listings."
+outcome_description = "No vera2- queue remains in the region in either SQS or MediaConvert. Deleting only the SQS queues leaves the MediaConvert queue behind and fails."
+criteria_descriptions = [
+  "no MediaConvert queue named vera2-* remains in the region",
+  "no SQS queue named vera2-* remains in the region, polled for up to a minute to allow for listing lag",
+]
 keywords = ["aws", "sqs", "mediaconvert", "decommissioning", "resource-discovery"]
 extra_tools = []

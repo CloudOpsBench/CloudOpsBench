@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Creates prod-vpc and shared-vpc with an active peering connection, custom route
-# tables without cross-VPC routes, and security groups without a 5432 ingress rule.
-# Resource identifiers are written to seed_state.json.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
@@ -68,7 +65,7 @@ mk_sg() {
 }
 
 echo "== prod-vpc security groups (10 - names scrambled from their real Role) =="
-APP_SG=$(mk_sg "$PROD_VPC" prod-web-sg application-servers)        # actually the app tier
+APP_SG=$(mk_sg "$PROD_VPC" prod-web-sg application-servers)        # the real app tier
 mk_sg "$PROD_VPC" prod-app-sg web-frontend          >/dev/null
 mk_sg "$PROD_VPC" prod-db-sg cache-layer            >/dev/null
 mk_sg "$PROD_VPC" prod-cache-sg background-workers  >/dev/null
@@ -80,7 +77,7 @@ mk_sg "$PROD_VPC" prod-admin-sg legacy-service      >/dev/null
 mk_sg "$PROD_VPC" prod-legacy-sg external-partners  >/dev/null
 
 echo "== shared-vpc security groups (5) =="
-SHARED_RDS_SG=$(mk_sg "$SHARED_VPC" shared-rds-sg primary-database "Primary RDS database (PostgreSQL, port 5432)") # intentionally no 5432 inbound
+SHARED_RDS_SG=$(mk_sg "$SHARED_VPC" shared-rds-sg primary-database "Primary RDS database (PostgreSQL, port 5432)") # no 5432 inbound rule
 mk_sg "$SHARED_VPC" shared-replica-sg read-replica  >/dev/null
 mk_sg "$SHARED_VPC" shared-cache-sg elasticache     >/dev/null
 mk_sg "$SHARED_VPC" shared-search-sg opensearch     >/dev/null

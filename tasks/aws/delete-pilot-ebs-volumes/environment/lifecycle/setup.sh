@@ -3,7 +3,7 @@
 # confirms with a canary volume that the rule is enforcing, then creates the
 # pilot volume. The seeded state is recorded in seed_state.json for the checker.
 set -euo pipefail
-REGION=us-east-1   # the pilot only ever worked here; pinned so setup, grader and teardown cannot disagree
+REGION=us-east-1   # pinned so setup, grader and teardown agree
 SUF="$(date +%s | tail -c 5)${RANDOM}"
 AZ=$(aws ec2 describe-availability-zones --region "$REGION" --query 'AvailabilityZones[0].ZoneName' --output text)
 
@@ -37,8 +37,7 @@ done
 [ "$ST" = "available" ] || { echo "FATAL: recycle-bin rule never became available (last=$ST)"; exit 1; }
 
 MINE=$(mktemp)
-# Retry until a wall-clock deadline rather than a fixed attempt count, because one
-# create/delete/poll round can take over a minute and setup has a 10-minute limit.
+# Use a wall-clock deadline: one round can take over a minute and setup has a 10-minute limit.
 PROVE_DEADLINE=$(( $(date +%s) + 330 ))
 prove_enforcing() {  # echoes the captured volume id on success, else returns 1
   local i j C IN
@@ -91,7 +90,6 @@ rm -f "$MINE"
 LEFT=$(aws ec2 list-volumes-in-recycle-bin --region "$REGION" --query 'length(Volumes)' --output text 2>/dev/null || echo 0)
 [ "$LEFT" = "0" ] || echo "note: $LEFT unrelated volume(s) from an earlier run remain in the bin; they are not removable and expire on their own"
 
-# The pilot volume: an available EBS volume tagged Project=vera2, covered by the rule.
 VOL=$(mkvol data)
 wait_vol "$VOL" || { echo "FATAL: volume $VOL never became available"; exit 1; }
 

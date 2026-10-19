@@ -2,7 +2,7 @@
 
 The vera-events-stream-<region> Kinesis data stream has a resource policy that lets anyone access it. Tighten it to least privilege so that only the events-producer application (IAM role vera-events-producer-<region>) can write to the stream.
 
-The Terraform managing the stream is in the workspace at `$AGENT_WORKSPACE` — make the change there and apply.
+The Terraform managing the stream is in the workspace at `$AGENT_WORKSPACE`. Make the change there and apply.
 
 ## Environment
 

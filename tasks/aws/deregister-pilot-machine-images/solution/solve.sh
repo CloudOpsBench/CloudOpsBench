@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Deletes the Recycle Bin retention rules covering Project=vera2 images, restores
-# any binned images, deregisters the images and deletes their snapshots.
+# Deletes the Recycle Bin rule, restores binned images, then deregisters them and deletes their snapshots.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
-# Delete the retention rules first; otherwise a deregistered image is captured again.
+# Delete the retention rules first or the deregistered image is captured again.
 for R in $(aws rbin list-rules --region "$REGION" --resource-type EC2_IMAGE \
              --query 'Rules[].Identifier' --output text 2>/dev/null | tr '\t' '\n'); do
   [ -n "$R" ] && [ "$R" != "None" ] || continue
@@ -15,14 +14,12 @@ for R in $(aws rbin list-rules --region "$REGION" --resource-type EC2_IMAGE \
   aws rbin delete-rule --region "$REGION" --identifier "$R" >/dev/null 2>&1 || true
 done
 
-# Restore images already held in the Recycle Bin.
 for I in $(aws ec2 list-images-in-recycle-bin --region "$REGION" \
              --query 'Images[].ImageId' --output text 2>/dev/null | tr '\t' '\n'); do
   [ -n "$I" ] && [ "$I" != "None" ] || continue
   aws ec2 restore-image-from-recycle-bin --region "$REGION" --image-id "$I" >/dev/null 2>&1 || true
 done
 
-# Deregister the images, then delete the snapshots they referenced.
 for I in $(aws ec2 describe-images --region "$REGION" --owners self \
              --filters "Name=tag:Project,Values=vera2" \
              --query 'Images[].ImageId' --output text 2>/dev/null | tr '\t' '\n'); do

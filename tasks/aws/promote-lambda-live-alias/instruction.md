@@ -2,7 +2,7 @@
 
 We shipped a new build of the order-processor Lambda (vera-order-processor-<region>). The new handler is in index.py. Roll it out: publish the new code and cut the `live` alias over to it so production runs the new version.
 
-The Terraform managing the function is in the workspace at `$AGENT_WORKSPACE` — make the change there and apply.
+The Terraform managing the function is in the workspace at `$AGENT_WORKSPACE`. Make the change there and apply.
 
 ## Environment
 

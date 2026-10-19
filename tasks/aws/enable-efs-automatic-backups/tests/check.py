@@ -1,8 +1,4 @@
-"""Check that automatic backups are enabled on every vera2 EFS file system.
-
-Passes when each seeded file system, in every seeded region, has a backup policy
-status of ENABLED or ENABLING.
-"""
+"""Check that every seeded vera2 EFS file system, in every region, has backups ENABLED or ENABLING."""
 import boto3
 import checkkit as ck
 seed = ck.seed(); missing = []

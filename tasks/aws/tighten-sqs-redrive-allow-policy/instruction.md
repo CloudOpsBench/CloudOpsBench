@@ -2,7 +2,7 @@
 
 The vera-orders-dlq-<region> dead-letter queue currently lets any queue in the account use it as a redrive target. Tighten its redrive-allow policy to least privilege so that the vera-orders-main-<region> queue can still use it as a dead-letter target.
 
-The Terraform managing these queues is in the workspace at `$AGENT_WORKSPACE` — make the change there and apply.
+The Terraform managing these queues is in the workspace at `$AGENT_WORKSPACE`. Make the change there and apply.
 
 ## Environment
 

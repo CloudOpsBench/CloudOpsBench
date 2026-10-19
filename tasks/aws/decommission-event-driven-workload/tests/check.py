@@ -39,16 +39,13 @@ regions = [p.get("primary_region", "us-east-1"), p.get("secondary_region", "us-w
 
 remaining = []
 for region in regions:
-    # EventBridge rules
     for r in (aws(["events", "list-rules", "--name-prefix", prefix], region) or {}).get("Rules", []):
         name = r.get("Name", "")
         if prefix in name:
             remaining.append(f"events/{region}/{name}")
-    # SQS queues
     qs = aws(["sqs", "list-queues", "--queue-name-prefix", prefix], region) or {}
     for u in qs.get("QueueUrls", []) or []:
         remaining.append(f"sqs/{region}/{u.split('/')[-1]}")
-    # SNS topics
     for t in (aws(["sns", "list-topics"], region) or {}).get("Topics", []):
         arn = t.get("TopicArn", "")
         if prefix in arn:

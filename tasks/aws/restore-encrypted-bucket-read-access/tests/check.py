@@ -37,7 +37,7 @@ def stmt_allows_decrypt_scoped(stmt, key_arn, key_id):
     if not any(a in ("kms:Decrypt", "kms:*") for a in actions):
         return False
     resources = as_list(stmt.get("Resource"))
-    # must reference the specific key — wildcard "*" resource does not count
+    # A bare "*" resource does not count.
     return any((key_arn in r or key_id in r) and r != "*" for r in resources)
 
 
@@ -54,7 +54,6 @@ def doc_has_wildcard_allow(doc):
     return False
 
 
-# The object is still encrypted with the original key.
 head = s3.head_object(Bucket=data_bucket, Key="reports/q1.txt")
 ck.require(
     head.get("ServerSideEncryption") == "aws:kms",
@@ -66,7 +65,6 @@ ck.require(
     "Data object is no longer encrypted with the original CMK"
 )
 
-# The identity policy grants scoped kms:Decrypt and keeps the S3 read.
 identity_ok = False
 s3_read_intact = False
 for pname in iam.list_role_policies(RoleName=app_role)["PolicyNames"]:
@@ -89,7 +87,6 @@ ck.require(
 )
 ck.require(s3_read_intact, "Role's original S3 read access to the data bucket was removed")
 
-# The permissions boundary is attached, permits scoped decrypt, and has no wildcard Allow.
 role = iam.get_role(RoleName=app_role)["Role"]
 pb = role.get("PermissionsBoundary", {})
 boundary_arn = pb.get("PermissionsBoundaryArn")
@@ -114,7 +111,6 @@ ck.require(
     "Permissions boundary was blown open with a broad wildcard Allow — it must be extended minimally"
 )
 
-# The boundary must still permit the original S3 read.
 boundary_s3_ok = any(
     stmt.get("Effect") == "Allow"
     and any(a in ("s3:GetObject", "s3:*") for a in as_list(stmt.get("Action")))
@@ -123,7 +119,6 @@ boundary_s3_ok = any(
 )
 ck.require(boundary_s3_ok, "Permissions boundary no longer permits the original S3 read access")
 
-# The archive bucket's encryption is unchanged.
 try:
     enc = s3.get_bucket_encryption(Bucket=archive_bucket)
     algo = enc["ServerSideEncryptionConfiguration"]["Rules"][0][

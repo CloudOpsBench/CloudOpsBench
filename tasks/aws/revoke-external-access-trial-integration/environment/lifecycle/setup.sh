@@ -6,7 +6,7 @@ AWS_REGION="us-east-1"
 STAMP="$(date +%s)${RANDOM}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "000000000000")
 
-# Clean up any vera2 leftovers from a prior run before seeding fresh state.
+# Remove leftovers from earlier runs.
 aws sns list-topics --region "$AWS_REGION" --query 'Topics[].TopicArn' --output text 2>/dev/null \
   | tr '\t' '\n' | grep ':vera2-' | while read -r stale; do
     [ -n "$stale" ] && aws sns delete-topic --topic-arn "$stale" --region "$AWS_REGION" 2>/dev/null || true

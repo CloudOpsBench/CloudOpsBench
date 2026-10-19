@@ -20,7 +20,6 @@ DIM = state["dimension"]
 WANT_MIN, WANT_MAX = state["want_min"], state["want_max"]
 errors = []
 
-# Table is still provisioned.
 try:
     t = ddb.describe_table(TableName=state["table"])["Table"]
     bm = (t.get("BillingModeSummary") or {}).get("BillingMode", "PROVISIONED")
@@ -30,7 +29,6 @@ try:
 except ClientError as e:
     errors.append("the table is gone (%s); it had to be kept" % e.response.get("Error", {}).get("Code"))
 
-# Scalable target allows the required range.
 try:
     tgts = aas.describe_scalable_targets(ServiceNamespace="dynamodb", ResourceIds=[RID],
                                          ScalableDimension=DIM)["ScalableTargets"]
@@ -44,7 +42,6 @@ try:
 except ClientError as e:
     errors.append("could not read the scalable target (%s)" % e.response.get("Error", {}).get("Code"))
 
-# No enabled schedule re-registers the target at a lower or fixed range.
 try:
     names = []
     token = None
@@ -83,7 +80,6 @@ try:
 except ClientError as e:
     errors.append("could not read schedules (%s)" % e.response.get("Error", {}).get("Code"))
 
-# Target-tracking scaling policy is still present.
 try:
     pols = aas.describe_scaling_policies(ServiceNamespace="dynamodb", ResourceId=RID,
                                          ScalableDimension=DIM)["ScalingPolicies"]

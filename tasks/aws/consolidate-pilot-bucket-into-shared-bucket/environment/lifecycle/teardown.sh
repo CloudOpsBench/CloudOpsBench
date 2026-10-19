@@ -4,7 +4,7 @@
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
-# setup.sh records the exact scope before creating either bucket. Never sweep unrelated vera2-* resources.
+# Only touch the buckets setup.sh recorded, never other vera2-* resources.
 python3 - "$REGION" <<'PY'
 import json
 import os

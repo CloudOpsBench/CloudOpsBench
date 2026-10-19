@@ -114,7 +114,6 @@ def judge_path(label, doc_text, target_role_arn, runner_role_arn, extra_evidence
              "%s lost its catalog access: %s for %s on %s. The task requires every "
              "integration to keep the catalog read access it has today."
              % (label, ev, action, CATALOG_ARN))
-    # The runner must still be able to assume what the path targets.
     runner_docs, why = role_policies(runner_role_arn)
     if not need(why is None,
                 "%s runs as %s, but %s; the integration can no longer start."
@@ -134,7 +133,6 @@ def judge_path(label, doc_text, target_role_arn, runner_role_arn, extra_evidence
              % (label, role_name_of(runner_role_arn), action, PRICING_ARN))
 
 
-# Glue export job.
 try:
     job = glue.get_job(JobName=seed["glue_job"])["Job"]
 except Exception as exc:
@@ -168,7 +166,6 @@ if job is not None:
                       "integration can no longer run."
                       % (seed["script_bucket"], seed["script_key"], exc))
 
-# CodeBuild feed refresh.
 try:
     projects = cb.batch_get_projects(names=[seed["codebuild_project"]])["projects"]
 except Exception:
@@ -362,7 +359,6 @@ for principal in ["arn:aws:iam::%s:root" % seed["account"]]:
          "%s. Whatever could assume the role at the start still has to be able to."
          % (ROLE, principal, whyp))
 
-# Reconciliation path.
 recon_docs, why = role_policies(seed["recon_role_arn"])
 if need(why is None,
         "the reconciliation role %s could not be read: %s; it has to keep its way in."
@@ -372,7 +368,6 @@ if need(why is None,
          "the reconciliation role %s can no longer assume %s (its policies evaluate %s); "
          "reconciliation has to keep its way in." % (seed["recon_role"], ROLE, d))
 
-# Tables: untouched, no resource policies, data intact.
 for tname, tarn in ((seed["catalog_table"], CATALOG_ARN),
                     (seed["pricing_table"], PRICING_ARN)):
     try:

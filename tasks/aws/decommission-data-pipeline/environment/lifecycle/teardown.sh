@@ -10,7 +10,6 @@ get() { python3 -c "import json;d=json.load(open('$PARAMS'));print(d$1)" 2>/dev/
 if [[ -f "$PARAMS" ]]; then
   PRIMARY="$(get "['primary_region']")"; SECONDARY="$(get "['secondary_region']")"
   PREFIX="$(get "['prefix']")"
-  # Delete by the recorded names.
   aws dynamodb delete-table --table-name "$(get "['home']['table']")" --region "$PRIMARY" >/dev/null 2>&1 || true
   aws kinesis delete-stream --stream-name "$(get "['home']['stream']")" --region "$PRIMARY" >/dev/null 2>&1 || true
   aws ecr delete-repository --repository-name "$(get "['home']['repo']")" --force --region "$PRIMARY" >/dev/null 2>&1 || true
@@ -23,10 +22,10 @@ else
   if [[ "$PRIMARY" == "us-west-2" ]]; then SECONDARY="us-east-1"; else SECONDARY="us-west-2"; fi
   PREFIX="adt-"
 fi
-# never sweep with an empty prefix (would match every resource in the account)
+# An empty prefix would match every resource in the account.
 [[ -n "$PREFIX" ]] || PREFIX="adt-"
 
-# Prefix sweep across both regions for anything not deleted above.
+# Sweep both regions by prefix for anything not deleted above.
 for region in "$PRIMARY" "$SECONDARY"; do
   for t in $(aws dynamodb list-tables --region "$region" --query "TableNames[?contains(@,'${PREFIX}')]" --output text 2>/dev/null); do
     aws dynamodb delete-table --table-name "$t" --region "$region" >/dev/null 2>&1 || true

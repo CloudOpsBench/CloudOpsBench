@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Best-effort cleanup of the resources recorded in seed_state.json. Errors are
-# ignored so teardown never fails the run.
+# Best-effort cleanup of the resources in seed_state.json. Errors are ignored.
 set -uo pipefail
 python3 - <<'PY' 2>/dev/null || true
 import boto3, json, os

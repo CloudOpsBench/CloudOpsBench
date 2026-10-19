@@ -1,10 +1,4 @@
-"""Check that nothing writes into the retired telemetry archive bucket any more.
-
-Passes when the seeded object versions in the retired bucket are intact, every writer that
-targeted it now targets the replacement bucket with its other settings unchanged, resources
-outside the cutover are untouched, and probe objects replicate to the replacement and
-compliance buckets but not to the retired one.
-"""
+"""Check that nothing writes into the retired archive and every writer now targets the replacement."""
 import json
 import time
 import uuid
@@ -61,8 +55,7 @@ def canon(x):
     return json.dumps(x, sort_keys=True, default=str)
 
 
-# Probes are written first and checked at the end, so the replication wait overlaps the
-# configuration checks.
+# Probes go out first so the replication wait overlaps the configuration checks.
 tag = uuid.uuid4().hex[:10]
 probe_in = "telemetry/grader-probe-%s.json" % tag
 probe_edge = "telemetry/grader-probe-edge-%s.json" % tag
@@ -83,9 +76,7 @@ def legacy_received():
     return None
 
 
-# Seeded object versions in the retired bucket must be intact.
 def version_intact(entry):
-    """True if the exact seeded version still exists with its original ETag."""
     try:
         got = s3.head_object(Bucket=LEGACY, Key=entry["Key"], VersionId=entry["VersionId"])
     except Exception:
@@ -100,7 +91,6 @@ need(not gone,
      % (LEGACY, len(gone), len(seed["legacy_versions"]),
         json.dumps([{"Key": e["Key"], "VersionId": e["VersionId"]} for e in gone[:5]])))
 
-# Resources outside the cutover must be unchanged.
 tasks = {}
 for reg in (REGION, EDGE):
     d = boto3.client("datasync", region_name=reg)
@@ -159,7 +149,6 @@ for bucket, client, seeded in ((INGEST, s3, seed["ingest_replication"]),
                 json.dumps([{k: v for k, v in r.items() if k not in ("ID", "Priority")}
                             for r in cfg["Rules"]], default=str)))
 
-# The delivery stream and the partner sync must target the replacement bucket.
 fh = boto3.client("firehose", region_name=REGION)
 try:
     stream = fh.describe_delivery_stream(
@@ -229,7 +218,6 @@ if need(seed["partner_task_name"] in tasks,
             json.dumps({k: want_task.get(k) for k in drifted}, default=str),
             json.dumps({k: cur_task.get(k) for k in drifted}, default=str)))
 
-# No writer in either region may still target the retired bucket.
 for reg in (REGION, EDGE):
     f = boto3.client("firehose", region_name=reg)
     try:
@@ -336,7 +324,6 @@ need(ingest_log.get("TargetBucket") == NEW
      "its logging configuration is now %s"
      % (INGEST, seed["access_log_prefix"], NEW, json.dumps(ingest_log, default=str)))
 
-# Wait for the probe objects to replicate.
 WANT = [(COMPLIANCE, probe_in, INGEST, "the compliance feed"),
         (COMPLIANCE, probe_edge, EDGE_INGEST, "the compliance feed"),
         (NEW, probe_in, INGEST, "replication into the replacement archive"),

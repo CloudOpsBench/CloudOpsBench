@@ -35,7 +35,6 @@ case "${KEY_ARN}" in
   *) KEY_ARN="$(aws kms describe-key --key-id "${KEY_ARN}" --query 'KeyMetadata.Arn' --output text)" ;;
 esac
 
-# Identity policy: allow kms:Decrypt on the specific key.
 cat > /tmp/kms-identity.json <<EOF
 {
   "Version": "2012-10-17",
@@ -53,8 +52,7 @@ aws iam put-role-policy --role-name "${APP_ROLE}" --policy-name "kms-decrypt-dat
   --policy-document file:///tmp/kms-identity.json
 echo "Identity policy: added kms:Decrypt scoped to the data key."
 
-# Effective permissions are the intersection of the identity policy and the
-# boundary, so the boundary gets the same scoped kms:Decrypt statement.
+# Effective permissions are the intersection of identity policy and boundary, so both need it.
 BOUNDARY_ARN="$(aws iam get-role --role-name "${APP_ROLE}" \
   --query 'Role.PermissionsBoundary.PermissionsBoundaryArn' --output text)"
 echo "Boundary: ${BOUNDARY_ARN}"

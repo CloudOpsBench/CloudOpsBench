@@ -11,8 +11,7 @@ retry() { local n=0; until "$@"; do n=$((n+1)); [ "$n" -ge 10 ] && return 1; sle
 
 BKT=$(aws s3api list-buckets \
   --query "Buckets[?starts_with(Name, 'evidence-store-')].Name | [0]" --output text)
-# The evidence-archiver- prefix also matches the dead-letter queue and
-# list-queues is unordered, so exclude the dead-letter queue by name.
+# The dead-letter queue shares the evidence-archiver- prefix, so exclude it by name.
 ARCH_URL=$(aws sqs list-queues --queue-name-prefix evidence-archiver- \
   --query "QueueUrls[?!contains(@, 'evidence-archiver-dlq-')] | [0]" --output text)
 ARCH_ARN=$(aws sqs get-queue-attributes --queue-url "$ARCH_URL" \
@@ -24,7 +23,6 @@ TOPIC_ARN=$(aws sns list-topics \
 REC_RULE=$(aws events list-rules --event-bus-name "$BUS" \
   --query "Rules[?starts_with(Name, 'evidence-recorder-')].Name | [0]" --output text)
 
-# Read the existing capture rule's pattern so the new rule matches it.
 CAP_RULE=$(aws events list-rules --event-bus-name "$BUS" \
   --query "Rules[?starts_with(Name, 'evidence-capture-')].Name | [0]" --output text)
 CAP_PATTERN=$(aws events describe-rule --name "$CAP_RULE" --event-bus-name "$BUS" \
@@ -32,8 +30,7 @@ CAP_PATTERN=$(aws events describe-rule --name "$CAP_RULE" --event-bus-name "$BUS
 
 echo "bucket=$BKT archiver=$ARCH_ARN bus=$BUS rule=$CAP_RULE"
 
-# Recreate the capture rule on the default bus, where S3 events are delivered.
-# This changes the rule's ARN.
+# S3 events only arrive on the default bus. Recreating the rule there changes its ARN.
 retry aws events put-rule --name "$CAP_RULE" --event-pattern "$CAP_PATTERN" \
   --state ENABLED --description "Capture evidence-store object writes for the archiver" >/dev/null
 retry aws events put-targets --rule "$CAP_RULE" \
@@ -41,15 +38,12 @@ retry aws events put-targets --rule "$CAP_RULE" \
 NEW_RULE_ARN=$(aws events describe-rule --name "$CAP_RULE" --query Arn --output text)
 echo "re-homed rule ARN=$NEW_RULE_ARN"
 
-# The recorder rule has no target; point it at the archiver queue.
 retry aws events put-targets --rule "$REC_RULE" --event-bus-name "$BUS" \
   --targets "Id=archiver,Arn=$ARCH_ARN" >/dev/null
 REC_RULE_ARN=$(aws events describe-rule --name "$REC_RULE" --event-bus-name "$BUS" \
   --query Arn --output text)
 echo "recorder rule ARN=$REC_RULE_ARN"
 
-# The sealer state machine sends to the dead-letter queue; repoint it at the
-# archiver queue.
 SEALER_ARN=$(aws stepfunctions list-state-machines \
   --query "stateMachines[?starts_with(name, 'evidence-sealer-')].stateMachineArn | [0]" --output text)
 if [ -n "${SEALER_ARN:-}" ] && [ "$SEALER_ARN" != "None" ]; then
@@ -75,16 +69,13 @@ PY
   echo "repointed sealer state machine at the archive"
 fi
 
-# Subscribe the archiver queue to the SNS intake-alert topic.
 if [ -n "${TOPIC_ARN:-}" ] && [ "$TOPIC_ARN" != "None" ]; then
   retry aws sns subscribe --topic-arn "$TOPIC_ARN" --protocol sqs \
     --notification-endpoint "$ARCH_ARN" >/dev/null
   echo "subscribed archive to $TOPIC_ARN"
 fi
 
-# Update the queue policy's aws:SourceArn condition to the new rule ARNs.
-# SetQueueAttributes replaces the whole policy, so the other statements are
-# carried over.
+# SetQueueAttributes replaces the whole policy, so keep the other statements.
 CUR_POLICY=$(aws sqs get-queue-attributes --queue-url "$ARCH_URL" \
   --attribute-names Policy --query "Attributes.Policy" --output text)
 python3 - "$ARCH_ARN" "$CUR_POLICY" "$NEW_RULE_ARN,$REC_RULE_ARN" > arch-attrs.json <<'PY'
@@ -145,8 +136,7 @@ for KEY in $(aws s3api list-objects-v2 --bucket "$BKT" --query 'Contents[].Key' 
   echo "backfilled $KEY"
 done
 
-# Remove the unused capture rule from the custom bus. The bus and the
-# retention-tagger rule are left in place.
+# Delete the old capture rule. The bus and retention-tagger rule stay.
 aws events remove-targets --rule "$CAP_RULE" --event-bus-name "$BUS" --ids archiver >/dev/null 2>&1 || true
 aws events delete-rule --name "$CAP_RULE" --event-bus-name "$BUS" >/dev/null 2>&1 || true
 

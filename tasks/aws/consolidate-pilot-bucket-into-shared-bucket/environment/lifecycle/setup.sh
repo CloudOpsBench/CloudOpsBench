@@ -8,7 +8,7 @@ SUF="$(date +%s)-${RANDOM}-${RANDOM}"
 SRC="vera2-${SUF}-pilot"
 DST="vera2-${SUF}-shared"
 
-# Write the exact cleanup scope before creating anything so teardown can recover from a partial setup.
+# Record the cleanup scope before creating anything so teardown can recover from a partial setup.
 python3 - "$REGION" "$SRC" "$DST" <<'PY'
 import json, sys
 json.dump({"region": sys.argv[1], "source_bucket": sys.argv[2], "shared_bucket": sys.argv[3]},

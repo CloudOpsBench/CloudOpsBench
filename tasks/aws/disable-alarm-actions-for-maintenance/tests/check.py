@@ -1,7 +1,6 @@
-"""Check that alarm actions are disabled on every seeded vera2 alarm.
+"""Check that every seeded vera2 alarm exists with actions disabled.
 
-Passes when ActionsEnabled is false on all seeded metric and composite alarms. Both
-AlarmTypes are requested because describe_alarms returns only metric alarms by default.
+Both AlarmTypes are requested because describe_alarms returns only metric alarms by default.
 """
 import boto3
 import checkkit as ck

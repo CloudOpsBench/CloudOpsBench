@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Deletes every Athena work-group, secret, SSM parameter and SQS queue whose name carries
+# Deletes every Athena workgroup, secret, SSM parameter and SQS queue whose name carries
 # the `aaq-7c21` prefix, in all regions. SQS list_queues is eventually consistent after
-# create, so the retry with backoff runs only in regions where another matching resource
-# was found; retrying in every region would exceed the time limit.
+# create, so the backoff retry only runs in regions where another matching resource was
+# found. Retrying in every region would exceed the time limit.
 set -euo pipefail
 python3 - <<'PY'
 import time
@@ -35,11 +35,9 @@ def sqs_sweep(reg):
             print("skip sqs:", reg, u, e.response["Error"].get("Code"))
     return n
 
-# Strongly consistent services, across all regions.
-pending_sqs = []   # HOME regions whose eventually-consistent queue wasn't visible yet
+pending_sqs = []   # regions with prefix resources but no visible queue yet
 for reg in regions:
     hit = False
-    # Athena work-groups
     try:
         ath = boto3.client("athena", region_name=reg)
         tok = None
@@ -62,7 +60,6 @@ for reg in regions:
     except ClientError:
         pass
 
-    # Secrets Manager
     try:
         sm = boto3.client("secretsmanager", region_name=reg)
         for page in sm.get_paginator("list_secrets").paginate():
@@ -78,7 +75,6 @@ for reg in regions:
     except ClientError:
         pass
 
-    # SSM parameters
     try:
         ssm = boto3.client("ssm", region_name=reg)
         for page in ssm.get_paginator("describe_parameters").paginate():
@@ -95,13 +91,12 @@ for reg in regions:
     except ClientError:
         pass
 
-    # one immediate best-effort SQS pass (the queue may already be consistent)
     got = sqs_sweep(reg)
     deleted += got
     if hit and got == 0:
         pending_sqs.append(reg)
 
-# SQS is eventually consistent: retry with backoff in home regions still missing the queue.
+# Retry with backoff where the queue was not visible yet.
 for reg in dict.fromkeys(pending_sqs):
     deadline, delay = time.time() + 180, 3
     while time.time() < deadline:

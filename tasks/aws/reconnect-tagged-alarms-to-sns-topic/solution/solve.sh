@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# For every alarm tagged App=nightbell in any region, add that region's
-# App=nightbell SNS topic as an alarm action.
 set -euo pipefail
 python3 <<'PY'
 import json, os, subprocess, sys

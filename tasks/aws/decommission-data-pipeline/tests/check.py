@@ -56,19 +56,15 @@ regions = [p.get("primary_region", "us-east-1"), p.get("secondary_region", "us-w
 
 remaining = []
 for region in regions:
-    # DynamoDB tables
     for name in (aws(["dynamodb", "list-tables"], region) or {}).get("TableNames", []):
         if prefix in name and not table_gone(name, region):
             remaining.append(f"dynamodb/{region}/{name}")
-    # Kinesis streams
     for name in (aws(["kinesis", "list-streams"], region) or {}).get("StreamNames", []):
         if prefix in name and not stream_gone(name, region):
             remaining.append(f"kinesis/{region}/{name}")
-    # ECR repositories
     for r in (aws(["ecr", "describe-repositories"], region) or {}).get("repositories", []):
         if prefix in r.get("repositoryName", ""):
             remaining.append(f"ecr/{region}/{r.get('repositoryName')}")
-    # SQS queues
     qs = aws(["sqs", "list-queues", "--queue-name-prefix", prefix], region) or {}
     for u in qs.get("QueueUrls", []) or []:
         remaining.append(f"sqs/{region}/{u.split('/')[-1]}")

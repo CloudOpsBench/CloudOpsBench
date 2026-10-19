@@ -18,7 +18,7 @@ GONE = {
 }
 
 def swallow(fn):
-    """Run a delete, treating already-gone / not-found as success (idempotent)."""
+    """Run a delete and return False if the resource was already gone."""
     try:
         fn()
         return True
@@ -28,7 +28,7 @@ def swallow(fn):
         raise
 
 def sqs_sweep(sqs):
-    """Delete every adt- queue currently visible; return how many were deleted."""
+    """Delete every visible adt- queue and return the count."""
     try:
         urls = sqs.list_queues(QueueNamePrefix=PREFIX).get("QueueUrls", []) or []
     except botocore.exceptions.ClientError:
@@ -40,9 +40,8 @@ def sqs_sweep(sqs):
     return n
 
 deleted = 0
-home_regions = []  # regions that host an adt- ECR repo == where an adt- SQS queue is expected
+home_regions = []  # the adt- queue is expected wherever the adt- ECR repo is
 for reg in regions:
-    # DynamoDB tables (strongly-consistent list)
     ddb = boto3.client("dynamodb", region_name=reg)
     try:
         tables = ddb.list_tables().get("TableNames", [])
@@ -52,7 +51,6 @@ for reg in regions:
         if t.startswith(PREFIX) and swallow(lambda t=t: ddb.delete_table(TableName=t)):
             print("del dynamodb", reg, t); deleted += 1
 
-    # Kinesis streams
     kin = boto3.client("kinesis", region_name=reg)
     try:
         streams = kin.list_streams().get("StreamNames", [])
@@ -62,7 +60,6 @@ for reg in regions:
         if s.startswith(PREFIX) and swallow(lambda s=s: kin.delete_stream(StreamName=s)):
             print("del kinesis", reg, s); deleted += 1
 
-    # ECR repositories
     ecr = boto3.client("ecr", region_name=reg)
     try:
         repos = ecr.describe_repositories().get("repositories", [])
@@ -75,14 +72,12 @@ for reg in regions:
             if swallow(lambda name=name: ecr.delete_repository(repositoryName=name, force=True)):
                 print("del ecr", reg, name); deleted += 1
 
-    # SQS queues: one immediate best-effort pass in every region
     got = sqs_sweep(boto3.client("sqs", region_name=reg))
     deleted += got
     if got and reg not in home_regions:
         home_regions.append(reg)
 
-# SQS is eventually consistent right after creation: in the home region(s) keep
-# retrying with backoff (~4 min) until the adt- queue surfaces, then delete it.
+# SQS listings lag queue creation, so retry with backoff (~4 min) in the home region(s).
 for reg in dict.fromkeys(home_regions):
     sqs = boto3.client("sqs", region_name=reg)
     deadline = time.time() + 240

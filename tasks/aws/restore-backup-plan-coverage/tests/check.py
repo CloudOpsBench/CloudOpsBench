@@ -25,8 +25,7 @@ ddb = boto3.client("dynamodb", region_name=REGION)
 efs = boto3.client("efs", region_name=REGION)
 s3 = boto3.client("s3", region_name=REGION)
 
-# Upper bound for the backup jobs to finish. Observed worst case is about 2m45s
-# for an empty table.
+# Observed worst case for an empty table is about 2m45s.
 JOB_DEADLINE = 420
 
 
@@ -42,7 +41,6 @@ def err(e):
     return f"{e.response['Error']['Code']}: {e.response['Error']['Message']}"
 
 
-# Read the plan, the vault and the plan's current selections.
 try:
     plan = backup.get_backup_plan(BackupPlanId=PLAN_ID)["BackupPlan"]
 except botocore.exceptions.ClientError as e:
@@ -154,7 +152,6 @@ def matching_selections(arn):
 matches = {arn: matching_selections(arn) for arn in PROTECTED + [EXCLUDED]}
 
 
-# Requirement 1: start the job the plan would run for each matched resource.
 def start(arn, role_arn):
     return backup.start_backup_job(BackupVaultName=VAULT, ResourceArn=arn,
                                    IamRoleArn=role_arn)["BackupJobId"]
@@ -184,8 +181,7 @@ def abandon():
             pass
 
 
-# A refusal is already a final answer, so it is reported before the minutes of
-# polling the other jobs would take.
+# Report a refusal before spending minutes polling the other jobs.
 for arn in PROTECTED:
     if arn in refused:
         sid, role, message, at = refused[arn]
@@ -223,7 +219,6 @@ for arn in PROTECTED:
                f"this resource. Requirement 1 is that this job completes. Resource ARN: "
                f"{arn}")
 
-# Requirement 1: every fleet resource is matched by a selection.
 for arn in PROTECTED:
     hits, tags = matches[arn]
     ck.require(hits,
@@ -234,7 +229,6 @@ for arn in PROTECTED:
                f"Requirement 1 is that every fleet resource except the scratch bucket is "
                f"covered by a selection on this plan. Resource ARN: {arn}")
 
-# Requirement 2: the scratch bucket is not backed up.
 vol_hits, vol_tags = matches[EXCLUDED]
 if vol_hits:
     sid, sel = vol_hits[0]
@@ -265,7 +259,6 @@ ck.require(not vol_points,
            f"({[p['RecoveryPointArn'] for p in vol_points][:3]}); requirement 2 is that the "
            f"scratch bucket is not backed up by {PLAN}")
 
-# Requirement 3: the seeded plan, vault and resources are still in place.
 rule_vaults = {r.get("TargetBackupVaultName") for r in plan.get("Rules", [])}
 ck.require(VAULT in rule_vaults,
            f"no rule on {PLAN} targets vault {VAULT} any more (rules target {rule_vaults}); "

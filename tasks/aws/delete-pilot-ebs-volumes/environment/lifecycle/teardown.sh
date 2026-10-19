@@ -2,7 +2,7 @@
 # Deletes the Recycle Bin retention rules covering Project=vera2 and the vera2
 # volumes, including any held in the Recycle Bin.
 set -uo pipefail
-REGION=us-east-1   # the pilot only ever worked here; pinned so setup, grader and teardown cannot disagree
+REGION=us-east-1   # pinned so setup, grader and teardown agree
 
 # Retention rules covering Project=vera2 must go first, or restored volumes get captured again.
 for R in $(aws rbin list-rules --region "$REGION" --resource-type EBS_VOLUME \
@@ -33,7 +33,7 @@ for _ in 1 2 3; do
     [ -n "$V" ] && [ "$V" != "None" ] || continue
     aws ec2 delete-tags --region "$REGION" --resources "$V" --tags Key=Project >/dev/null 2>&1 || true
   done
-  sleep 20   # let the untag propagate, so a rule whose deletion has not taken effect yet cannot re-capture
+  sleep 20   # let the untag propagate so a rule still being deleted cannot re-capture
   for V in $(list_pilot_volumes); do
     [ -n "$V" ] && [ "$V" != "None" ] || continue
     aws ec2 delete-volume --region "$REGION" --volume-id "$V" >/dev/null 2>&1 || true

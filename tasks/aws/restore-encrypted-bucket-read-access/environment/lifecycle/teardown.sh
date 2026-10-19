@@ -20,7 +20,6 @@ if [ -f seed_state.json ]; then
   done
   aws iam delete-role --role-name "${APP_ROLE}" || true
 
-  # delete non-default boundary policy versions, then the policy
   for V in $(aws iam list-policy-versions --policy-arn "${BOUNDARY_ARN}" \
       --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text 2>/dev/null || echo ""); do
     aws iam delete-policy-version --policy-arn "${BOUNDARY_ARN}" --version-id "${V}" || true

@@ -46,7 +46,6 @@ G_PRICING="/svc/pricing-engine-${SUF}"
 G_VENDOR="/svc/vendor-callback-raw-${SUF}"
 G_EDGE="/svc/edge-cache-${SUF}"
 
-# Destination streams.
 aws kinesis create-stream --stream-name "$STREAM" --shard-count 1 --region "$REGION" >/dev/null
 aws kinesis create-stream --stream-name "$ARCHIVE" --shard-count 1 --region "$REGION" >/dev/null
 aws kinesis create-stream --stream-name "$WSTREAM" --shard-count 1 --region "$WEST" >/dev/null
@@ -60,7 +59,6 @@ ARCHIVE_ARN="$(aws kinesis describe-stream --stream-name "$ARCHIVE" --region "$R
 WSTREAM_ARN="$(aws kinesis describe-stream --stream-name "$WSTREAM" --region "$WEST" \
   --query 'StreamDescription.StreamARN' --output text)"
 
-# Role that CloudWatch Logs assumes to write to the streams.
 aws iam create-role --role-name "$ROLE" --assume-role-policy-document \
   '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"logs.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
 python3 - "$ROLE" "$STREAM_ARN" "$ARCHIVE_ARN" "$WSTREAM_ARN" <<'PY'
@@ -76,7 +74,6 @@ boto3.client("iam").put_role_policy(
 PY
 ROLE_ARN="$(aws iam get-role --role-name "$ROLE" --query 'Role.Arn' --output text)"
 
-# Application log groups.
 create_group() {  # name, class, retention, region
   aws logs create-log-group --log-group-name "$1" --log-group-class "$2" --region "$4" >/dev/null
   aws logs put-retention-policy --log-group-name "$1" --retention-in-days "$3" --region "$4" >/dev/null
@@ -99,7 +96,7 @@ aws logs put-log-events --log-group-name "$G_EDGE" --log-stream-name application
   --log-events "timestamp=${NOW},message=INFO service started" \
                "timestamp=$((NOW+1)),message=INFO handled request id=7311" >/dev/null
 
-# IAM role propagation before CloudWatch Logs will accept it on a subscription filter.
+# Retry until the new role propagates and CloudWatch Logs accepts it on a filter.
 for _ in $(seq 1 20); do
   if aws logs put-subscription-filter --log-group-name "$G_CHECKOUT" --filter-name relay \
        --filter-pattern 'ERROR' --destination-arn "$STREAM_ARN" --role-arn "$ROLE_ARN" \

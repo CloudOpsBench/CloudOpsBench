@@ -1,9 +1,3 @@
-"""Check that no seeded resource policy grants access outside this account.
-
-Passes when the SNS topic, SQS queue, Kinesis stream and HealthOmics sequence store still
-exist, none allows a wildcard principal (unless a condition pins it to this account) or
-another account, and the sequence store's S3 access policy still grants this account.
-"""
 import json
 import time
 import subprocess
@@ -15,7 +9,7 @@ R = seed["region"]
 ACCT = seed["account"]
 
 
-# Reads go through the aws CLI so the check does not depend on the installed boto3 version.
+# Use the aws CLI so the check doesn't depend on the installed boto3 version.
 def aws(*args):
     return subprocess.run(["aws", "--region", R, "--output", "json", *args],
                           capture_output=True, text=True)
@@ -53,10 +47,7 @@ def _pinning_entries(cond):
 
 
 def condition_pins_to_account(cond):
-    """True if the Condition binds the caller to this account through an account-scoping key.
-
-    Keys the caller controls, such as principal tags, do not count.
-    """
+    """True if the Condition pins the caller to this account. Caller-controlled keys like principal tags don't count."""
     for k, vals in _pinning_entries(cond):
         if not vals:
             continue
@@ -161,7 +152,7 @@ def scan_open():
     return found
 
 
-# Re-read with a short wait so a just-written policy is not misread.
+# Re-read after a wait in case a just-written policy hasn't propagated.
 open_resources = scan_open()
 for _ in range(2):
     if not open_resources:

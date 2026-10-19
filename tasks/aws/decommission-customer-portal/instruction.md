@@ -1,4 +1,4 @@
-The customer portal has been shut down. Take it out of this account completely — nothing that belongs to
+The customer portal has been shut down. Take it out of this account completely. Nothing that belongs to
 it may still exist anywhere.
 
 Constraints:

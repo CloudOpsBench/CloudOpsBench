@@ -61,7 +61,6 @@ done
 for r in "$APP1" "$APP2" "$APP3" "$APP4" "$MIRROR"; do
   aws ecr create-repository --repository-name "$r" --region "$REGION" \
     --tags "Key=${TAGK},Value=${TAGV}" >/dev/null
-  # Repository-level scanOnPush is enabled on every repository.
   aws ecr put-image-scanning-configuration --repository-name "$r" --region "$REGION" \
     --image-scanning-configuration scanOnPush=true >/dev/null
 done
@@ -78,7 +77,6 @@ aws ecr create-repository --repository-name "$APP5" --region "$WEST"   --tags "K
 aws ecr put-image-scanning-configuration --repository-name "$APP5" --region "$WEST"   --image-scanning-configuration scanOnPush=true >/dev/null
 aws ecr put-registry-scanning-configuration --region "$WEST" --scan-type BASIC --rules '[]' >/dev/null
 
-# Replicate svc-* repositories to the registry in the second region.
 aws ecr put-replication-configuration --region "$REGION" --replication-configuration "$(
   python3 - "$ACCT" "$WEST" <<'PYR'
 import json,sys

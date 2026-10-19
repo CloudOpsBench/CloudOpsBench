@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Deletes every ACM certificate whose domain starts with vera2-. All key types
-# are listed explicitly because list-certificates returns only RSA_1024 and
-# RSA_2048 by default. Two passes allow for propagation.
+# list-certificates returns only RSA_1024/RSA_2048 by default, so every key type is requested.
+# Two passes allow for propagation.
 set -uo pipefail
 REGION="us-east-1"
 KT="keyTypes=RSA_1024,RSA_2048,RSA_3072,RSA_4096,EC_prime256v1,EC_secp384r1,EC_secp521r1"

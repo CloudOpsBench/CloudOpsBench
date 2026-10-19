@@ -1,8 +1,4 @@
-"""Check that every vera2 queue is gone from both SQS and MediaConvert.
-
-Passes when `mediaconvert list-queues` and `sqs list-queues` return no vera2- queues.
-SQS list-queues is eventually consistent after a delete, so that check is polled.
-"""
+"""Check that no vera2- queue remains in SQS or MediaConvert."""
 import time
 import boto3
 import checkkit as ck

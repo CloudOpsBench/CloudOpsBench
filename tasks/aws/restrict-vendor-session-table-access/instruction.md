@@ -14,7 +14,7 @@ be able to read it.
 ## What has to be true when you are done
 
 No session produced by a Meridian integration's stored configuration can read anything from
-`dataex-pricing` — not GetItem, BatchGetItem, Query, or Scan.
+`dataex-pricing` with GetItem, BatchGetItem, Query, or Scan.
 
 Every Meridian integration keeps the read access to `dataex-catalog` it has today, through
 the same path it uses today. Do not delete an integration, disable one, or remove its way

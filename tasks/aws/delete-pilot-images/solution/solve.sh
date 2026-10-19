@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Deregisters the vera2- AMIs and deletes the vera2- SageMaker images, then waits
-# for the asynchronous SageMaker deletions to finish.
+# Deregisters vera2- AMIs and deletes vera2- SageMaker images, then waits for the async deletes.
 set -uo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 

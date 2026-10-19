@@ -17,14 +17,12 @@ TARGET_ROLE="vera-price-test-query-role"
 
 echo "==> removing the Q1 price elasticity test"
 
-# Read the workgroup's result location before the workgroup is deleted.
 echo "--> reading the workgroup's result location first"
 aws athena get-work-group --work-group "${TARGET_WG}" \
   --query 'WorkGroup.Configuration.ResultConfiguration.OutputLocation' \
   --output text 2>/dev/null || true
 
-# Delete every version and delete marker; on a versioned bucket `s3 rm` only
-# adds a delete marker.
+# On a versioned bucket `s3 rm` only adds a delete marker.
 echo "--> purging every version and delete marker under ${TARGET_PREFIX}"
 for _pass in 1 2 3 4 5; do
   more=""
@@ -41,7 +39,7 @@ for _pass in 1 2 3 4 5; do
   [ -n "${more}" ] || break
 done
 
-# Abort unfinished multipart uploads, which object listings do not show.
+# Object listings do not show unfinished multipart uploads.
 echo "--> aborting any unfinished upload under ${TARGET_PREFIX}"
 while read -r k u; do
   [ -z "${k}" ] && continue
@@ -59,8 +57,7 @@ echo "--> deleting athena workgroup ${TARGET_WG}"
 aws athena delete-work-group --work-group "${TARGET_WG}" --recursive-delete-option \
   >/dev/null 2>&1 || true
 
-# Force-delete the secret; a plain delete-secret leaves it restorable for the
-# recovery window.
+# A plain delete-secret leaves the value restorable for the recovery window.
 echo "--> destroying secret ${TARGET_SECRET} (force, not scheduled)"
 aws secretsmanager delete-secret --secret-id "${TARGET_SECRET}" \
   --force-delete-without-recovery >/dev/null 2>&1 || true
@@ -76,8 +73,6 @@ for p in $(aws iam list-role-policies --role-name "${TARGET_ROLE}" \
 done
 aws iam delete-role --role-name "${TARGET_ROLE}" >/dev/null 2>&1 || true
 
-# The bucket and Finance's results, access point, workgroup, secret and role
-# are left untouched.
 echo "--> leaving Finance's weekly revenue reporting alone"
 
 echo "==> pricing experiment removed"

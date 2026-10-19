@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Deletes the batch-settlement state machine with its aliases and versions, and its role.
 set -euo pipefail
 SM_NAME="batch-settlement"
 ROLE_NAME="batch-settlement-sfn-role"

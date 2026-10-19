@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Seeds a versioned analytics bucket holding the pricing experiment's Athena
-# result sets and an unfinished multipart upload next to Finance's results, plus
-# an access point, Athena workgroup, secret and IAM role for each owner.
-# Verifies the fixture and writes seed_state.json.
+# Seeds a versioned analytics bucket with the pricing experiment's Athena results,
+# an unfinished multipart upload and Finance's results, plus an access point,
+# workgroup, secret and IAM role for each owner. Writes seed_state.json.
 set -euo pipefail
 
 _ts() { date -u +'%Y-%m-%dT%H:%M:%SZ'; }
@@ -30,7 +29,7 @@ export KEEPER_SECRET="vera/finance/warehouse-dsn"
 export TARGET_ROLE="vera-price-test-query-role"
 export KEEPER_ROLE="vera-finance-reporting-role"
 
-# Athena query execution ids; Athena names each result object after its query.
+# Athena names each result object after its query execution id.
 export QID_A="3f7a1c92-5b64-4d31-9a0e-7c2b8e11d456"
 export QID_B="8c41d0b7-2e59-4f88-b3aa-16d97f0c5e23"
 export QID_K="c5e30a48-9f71-42bd-8e66-b0d4a7213f90"
