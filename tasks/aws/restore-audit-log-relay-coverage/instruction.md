@@ -16,5 +16,5 @@ Constraints:
 
 - Every `/svc/` log group keeps the name and the retention setting it has now. Events already
   stored in them do not have to be preserved.
-- `/svc/vendor-callback-raw-*` is otherwise left unchanged.
+- `/svc/vendor-callback-raw-*` is otherwise left exactly as it is.
 - Do not delete or replace `audit-relay-stream-*` or the role `audit-relay-cwl-*`.

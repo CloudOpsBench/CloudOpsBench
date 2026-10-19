@@ -8,7 +8,7 @@ orders. No errors, bounces, or subscription failures have fired anywhere -
 the topic and the subscription both look healthy.
 
 Find and fix every reason urgent order events are not reaching the
-escalation queue, then confirm a fresh urgent event arrives there.
+escalation queue, then confirm a fresh urgent event actually arrives there.
 
 Constraints:
 1. The on-call tooling reads the queue's messages as plain JSON - it does

@@ -17,7 +17,8 @@ the objects already in it.
 Every producer that writes into the retired bucket is doing work that still has to happen.
 Each one must deliver the same data into the replacement archive instead of stopping, and
 must otherwise keep every setting it has now: the same source, schedule, filters, prefixes,
-paths, storage class, buffering and traffic selection. You will need to find all of them.
+paths, storage class, buffering and traffic selection. Only where the data goes changes.
+Finding all of them is part of the task, and nothing here lists them.
 
 Two of them also have to survive as named objects: the Firehose delivery stream
 `telemetry-raw-stream` is still ACTIVE when you are done, and a DataSync task named
@@ -30,4 +31,4 @@ compliance feed. Every rule that delivers to it must still deliver to it, with i
 configuration unchanged.
 
 The DataSync task `analytics-export-daily` is not part of this cutover. Leave its
-configuration unchanged.
+configuration exactly as it is.
