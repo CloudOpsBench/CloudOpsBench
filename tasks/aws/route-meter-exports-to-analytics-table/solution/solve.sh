@@ -148,7 +148,6 @@ for rgn in regions:
         cb.update_project(name=name, environment=env)
         print("codebuild %s in %s -> %s" % (name, rgn, wanted))
 
-# The Glue job.
 for page in glue.get_paginator("get_jobs").paginate():
     for job in page["Jobs"]:
         if not job["Name"].startswith("meter-export-nightly-"):
@@ -161,7 +160,7 @@ for page in glue.get_paginator("get_jobs").paginate():
         args = dict(update.get("DefaultArguments") or {})
         args["--" + SETTING] = wanted
         update["DefaultArguments"] = args
-        # The non-overridable copy is what the run actually uses, so it has to move too.
+        # The non-overridable copy is what the run uses, so it has to move too.
         if update.get("NonOverridableArguments"):
             fixed = dict(update["NonOverridableArguments"])
             if "--" + SETTING in fixed:

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Sets the order-error alarm threshold to 100 and deletes any schedule whose
-# target rewrites that alarm.
 set -euo pipefail
 
 python3 - <<'PY'
@@ -13,7 +11,6 @@ REGION = os.environ.get("AWS_REGION", "us-east-1")
 cw = boto3.client("cloudwatch", region_name=REGION)
 sch = boto3.client("scheduler", region_name=REGION)
 
-# Find the alarm from the live account.
 alarm = None
 token = None
 while True:
@@ -30,7 +27,6 @@ while True:
 if alarm is None:
     raise SystemExit("alarm not found")
 
-# Re-write the alarm with the corrected threshold, preserving its identity.
 put = {
     "AlarmName": alarm["AlarmName"],
     "Namespace": alarm["Namespace"],
@@ -47,7 +43,6 @@ if alarm.get("TreatMissingData"):
     put["TreatMissingData"] = alarm["TreatMissingData"]
 cw.put_metric_alarm(**put)
 
-# Remove any schedule that would write the alarm back.
 token = None
 while True:
     kw = {"NextToken": token} if token else {}

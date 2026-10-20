@@ -1,8 +1,8 @@
 """Check that the pricing experiment is removed and Finance's resources are intact.
 
 Passes when no versions, delete markers or unfinished uploads remain under the
-experiment prefix, its access point, workgroup, role and secret are gone (the secret
-not merely scheduled for deletion), and the bucket and Finance's resources still exist.
+experiment prefix, its access point, workgroup, role and secret are gone (the
+secret force-deleted), and the bucket and Finance's resources still exist.
 """
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ keeper_role = seed["keeper_role"]
 
 
 def _versions(prefix, key="Versions"):
-    """List every version (or delete marker) under the prefix, following pagination."""
+    """List every version (or delete marker) under the prefix."""
     out, km, vm = [], None, None
     while True:
         kw = {"Bucket": bucket, "Prefix": prefix, "MaxKeys": 500}
@@ -135,7 +135,6 @@ def _work_group_names():
     return out
 
 
-# Finance's resources must survive; checked first.
 try:
     s3.head_bucket(Bucket=bucket)
 except ClientError:
@@ -177,8 +176,7 @@ except ClientError:
     fail(f"the IAM role {keeper_role} was deleted — Finance's reporting runs as it")
 
 
-# The experiment's resources are polled against one shared 60s deadline, which
-# covers asynchronous deletion and eventually consistent reads.
+# Poll for up to 60s to allow for async deletion and eventually consistent reads.
 def _still(fn) -> bool:
     """Call fn; on an API error other than not-found, treat the resource as still present."""
     try:

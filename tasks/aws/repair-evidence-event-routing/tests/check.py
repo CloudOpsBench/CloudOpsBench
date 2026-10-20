@@ -139,8 +139,6 @@ def main():
 
     archived = collect(sqs, arch_url)
 
-    # The ingest role must still be able to send to the archiver queue, through
-    # either the queue policy or its own identity policy.
     arch_policy = json.loads(sqs.get_queue_attributes(
         QueueUrl=arch_url, AttributeNames=["Policy"])["Attributes"].get("Policy", "{}"))
     decided, allowed = ingest_can_send(iam, ingest_role_arn, arch_arn, arch_policy)
@@ -167,7 +165,6 @@ def main():
             "it sqs:SendMessage any more, and the prompt requires that path to keep "
             "working" % ingest_role_arn)
 
-    # Events must be routed through EventBridge, not a direct bucket notification.
     notif = s3.get_bucket_notification_configuration(Bucket=bucket)
     for key, label in (("QueueConfigurations", "an SQS queue"),
                        ("TopicConfigurations", "an SNS topic"),
@@ -183,7 +180,6 @@ def main():
         "EventBridgeConfiguration was removed by a notification-configuration "
         "rewrite, so nothing can reach the archiver queue through EventBridge")
 
-    # The retention flow on the platform bus must be intact.
     try:
         events.describe_event_bus(Name=bus)
     except Exception:
@@ -202,9 +198,7 @@ def main():
                "the rule %s no longer targets the retention-worker queue - the "
                "retention flow must keep working" % tagger)
 
-    # Probe actual delivery to the retention queue, since a Deny in the queue policy
-    # would block it without changing the rule. The queue is drained first and the
-    # probe is matched by a per-run token.
+    # Probe delivery, since a queue-policy Deny would block it without changing the rule.
     ret_token = "sealed-probe-%s" % uuid.uuid4().hex[:8]
     collect(sqs, ret_url, rounds=3, wait=1)
     ret_ok = False
@@ -230,14 +224,13 @@ def main():
 
     sns = ck.client("sns")
     topic_arn = seed["alert_topic_arn"]
-    # Matched by a per-run token, because other probes also deliver to this queue.
+    # Matched by a per-run token because other probes also deliver to this queue.
     sns_token = "intake-probe-%s" % uuid.uuid4().hex[:8]
     sns_ok = False
     for _ in range(4):
         sns.publish(TopicArn=topic_arn, Subject="evidence-intake",
                     Message=json.dumps({"probe": sns_token}))
-        # collect() deletes what it receives, so every body is kept for the
-        # completeness check below.
+        # collect() deletes what it receives, so bodies are kept for the completeness check.
         got = collect(sqs, arch_url, rounds=2, wait=10)
         archived.extend(got)
         if any(sns_token in b for b in got):
@@ -250,7 +243,6 @@ def main():
         "requires every source that is meant to deliver into %s to actually be "
         "delivering." % (topic_arn, seed["archiver_queue"]))
 
-    # An EvidenceRecorded event on the platform bus must reach the archiver queue.
     rec_token = "recorded-probe-%s" % uuid.uuid4().hex[:8]
     rec_ok = False
     for _ in range(4):
@@ -260,7 +252,6 @@ def main():
             "DetailType": "EvidenceRecorded",
             "Detail": json.dumps({"probe": rec_token}),
         }])
-        # Bodies are kept for the completeness check; the probe is matched by token.
         got = (collect(sqs, arch_url, rounds=2, wait=10)
                if resp.get("FailedEntryCount", 0) == 0 else [])
         archived.extend(got)
@@ -273,7 +264,6 @@ def main():
         "archiver queue. The rule that matches them is enabled and on the right bus, "
         "but nothing carries what it matches to the archive." % bus)
 
-    # Running the sealer state machine must put its record in the archiver queue.
     sfn = ck.client("stepfunctions")
     sealer_arn = seed["sealer_state_machine_arn"]
     sealer_ok = False
@@ -297,15 +287,13 @@ def main():
         "successfully, but its record is not arriving in %s."
         % (seed["sealer_state_machine"], seed["archiver_queue"]))
 
-    # A new object must reach the archiver queue. Keys use per-run random prefixes,
-    # and the write is repeated each round to allow for rule and policy propagation.
+    # The write repeats each round to allow for rule and policy propagation.
     run = uuid.uuid4().hex[:8]
     prefixes = ["audit-%s" % run, "%s-verify" % run]
     delivered = 0
     for i in range(15):
         s3.put_object(Bucket=bucket, Key="%s/%02d.json" % (prefixes[i % 2], i),
                       Body=b'{"evidence":"grader-probe"}')
-        # Bodies are kept for the completeness check below.
         got = collect(sqs, arch_url, rounds=2, wait=10)
         archived.extend(got)
         if got:
@@ -342,8 +330,7 @@ def main():
             "over about three minutes and nothing arrived.%s"
             % (bucket, seed["archiver_queue"], i + 1, detail))
 
-    # Delivery must not be limited to particular key prefixes: require a record for
-    # each of three keys (two per-run prefixes and intake/), polled in one window.
+    # Each key needs its own record, so routing narrowed to some prefixes fails.
     probe_keys = ["%s/probe.json" % prefixes[0],
                   "%s/probe.json" % prefixes[1],
                   "intake/%s-probe.json" % run]
@@ -351,7 +338,6 @@ def main():
         s3.put_object(Bucket=bucket, Key=key, Body=b'{"evidence":"grader-probe"}')
     seen = set()
     for _ in range(6):
-        # Bodies are kept for the completeness check below.
         got = collect(sqs, arch_url, rounds=2, wait=10)
         archived.extend(got)
         blob = "\n".join(got)
@@ -367,9 +353,7 @@ def main():
         "prefixes a repair happened to be tested on."
         % (bucket, len(missing_keys), ", ".join(missing_keys), seed["archiver_queue"]))
 
-    # Objects that were in the bucket before the repair must also have a record.
-    # Any message naming the object counts. Polled over a further window to allow
-    # for records still in flight.
+    # Any message naming a seed object counts. Poll longer for records still in flight.
     missing = [k for k in seed_objects if k not in "\n".join(archived)]
     for _ in range(12):
         if not missing:
@@ -384,9 +368,7 @@ def main():
         "object currently in the bucket to be represented in the archive."
         % (len(missing), len(seed_objects), bucket, ", ".join(missing)))
 
-    # Nothing should still be routed to the dead-letter queue. This checks current
-    # routing rather than queue depth, since a diagnostic run of the sealer can
-    # leave a message there.
+    # Check routing, not queue depth, since a diagnostic sealer run can leave a message in the DLQ.
     dlq_arn, dlq_url = seed["dlq_queue_arn"], seed["dlq_queue_url"]
     routed = []
 

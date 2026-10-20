@@ -39,19 +39,16 @@ run_id = p.get("run_id", "")
 
 remaining = []
 for region in regions:
-    # Athena work-groups
     for wg in (aws(["athena", "list-work-groups"], region) or {}).get("WorkGroups", []):
         if prefix in wg.get("Name", ""):
             remaining.append(f"athena/{region}/{wg.get('Name')}")
-    # Secrets Manager (the default list omits secrets scheduled for deletion)
+    # The default list omits secrets scheduled for deletion.
     for s in (aws(["secretsmanager", "list-secrets"], region) or {}).get("SecretList", []):
         if prefix in s.get("Name", ""):
             remaining.append(f"secret/{region}/{s.get('Name')}")
-    # SSM parameters, matched by prefix or by a /<run_id>/ path segment
     for par in (aws(["ssm", "describe-parameters"], region) or {}).get("Parameters", []):
         if prefix in par.get("Name", "") or (run_id and f"/{run_id}/" in par.get("Name", "")):
             remaining.append(f"ssm/{region}/{par.get('Name')}")
-    # SQS queues
     qs = aws(["sqs", "list-queues", "--queue-name-prefix", prefix], region) or {}
     for u in qs.get("QueueUrls", []) or []:
         remaining.append(f"sqs/{region}/{u.split('/')[-1]}")

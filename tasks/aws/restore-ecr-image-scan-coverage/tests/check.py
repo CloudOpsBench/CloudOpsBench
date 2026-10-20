@@ -24,7 +24,6 @@ events = ck.client("events")
 sns = ck.client("sns")
 ecr_w = ck.client("ecr", region_name=WEST)
 
-# Every seeded repository must still exist and not have been replaced.
 present = {}
 for name, ident in seed["repo_identity"].items():
     cli = ecr_w if ident.get("region") == WEST else ecr
@@ -44,7 +43,6 @@ for name, ident in seed["repo_identity"].items():
                 f"{d.get('encryptionConfiguration')}/{d.get('imageTagMutability')}")
     present[name] = d
 
-# Registry scanning coverage.
 cfg = ecr.get_registry_scanning_configuration()["scanningConfiguration"]
 scan_type = cfg.get("scanType")
 rules = cfg.get("rules", [])
@@ -123,7 +121,6 @@ ck.require(
     f"scanned automatically.",
 )
 
-# Scan events from every application repository must reach the security topic.
 try:
     sns.get_topic_attributes(TopicArn=TOPIC)
 except Exception as exc:  # noqa: BLE001

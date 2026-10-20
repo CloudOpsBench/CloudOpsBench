@@ -1,9 +1,4 @@
-"""Check that the pilot's image is deregistered and not held in the Recycle Bin.
-
-Passes when the seeded image is absent from `ec2 describe-images` and from
-`ec2 list-images-in-recycle-bin`. Images captured by a Recycle Bin retention rule
-are not returned by describe-images, so both are checked.
-"""
+"""Check that the pilot's image is deregistered and not in the Recycle Bin, which describe-images does not show."""
 import boto3
 import botocore
 import checkkit as ck
@@ -14,7 +9,6 @@ AMI = seed["image_id"]
 
 ec2 = boto3.client("ec2", region_name=R)
 
-# The image must be gone from the ordinary image list.
 plain = []
 try:
     plain = ec2.describe_images(ImageIds=[AMI]).get("Images", [])
@@ -27,7 +21,6 @@ ck.require(
     "the image %s is still a registered image in this account — it was not retired." % AMI,
 )
 
-# The image must not be held in the Recycle Bin either.
 binned = []
 token = None
 while True:

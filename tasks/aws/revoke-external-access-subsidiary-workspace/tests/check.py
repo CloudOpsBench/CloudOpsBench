@@ -34,7 +34,6 @@ def _is_public(statements):
 
 exposed = []
 
-# Serverless Application Repository application policy.
 app_id = seed.get("sar_app_id")
 if app_id:
     try:
@@ -44,7 +43,6 @@ if app_id:
     except Exception:
         pass
 
-# SNS topic policy.
 topic = seed.get("sns_topic_arn")
 if topic:
     try:

@@ -1,9 +1,4 @@
-"""Check that no vera2- image remains in EC2 or SageMaker.
-
-Passes when no vera2- AMI owned by the account is registered and
-`sagemaker list-images` returns no vera2- image. Images are enumerated by name,
-so only the region is read from seed_state.json.
-"""
+"""Check that no vera2- image remains in EC2 or SageMaker. Images are found by name, not from seed state."""
 import time
 import boto3
 import botocore
@@ -38,7 +33,7 @@ def list_sagemaker_images():
 deadline = time.time() + 90
 left = list_sagemaker_images()
 while left and time.time() < deadline:
-    # An image in any state other than DELETING was never deleted; stop waiting.
+    # Any status other than DELETING means the image was never deleted.
     if any(st not in ("DELETING",) for _, st in left):
         break
     time.sleep(5)

@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Check the repaired DynamoDB stream consumer.
-
-Passes when the protected resources and configuration match seed_state.json, the existing
-event-source mapping reports partial batch failures, bisects on error, retries twice, caps
-record age at 3600 seconds and sends failures to the archive bucket, and direct invocations
-handle poison records, replays, deletes, conflicts and transaction groups correctly.
-"""
 import concurrent.futures, hashlib, io, json, os, secrets, subprocess, sys, tempfile, time, urllib.request, uuid, zipfile
 
 
@@ -79,7 +72,6 @@ if not os.path.exists("seed_state.json"):
     fail("seed_state.json is missing")
 S=json.load(open("seed_state.json"))
 
-# Protected resources and configuration.
 src=aws_json(["dynamodb","describe-table","--table-name",S["source_table"]])["Table"]
 if src.get("TableArn") != S["source_table_arn"] or src.get("TableId") != S["source_table_id"]:
     fail("source DynamoDB table identity changed")
@@ -166,7 +158,6 @@ objects.sort(key=lambda x:x["Key"])
 if h(objects) != S["archive_objects_sha256"]:
     fail("failure-archive object set changed; do not generate synthetic archived failures during repair testing")
 
-# Event-source mapping settings.
 all_maps=aws_json(["lambda","list-event-source-mappings","--function-name",S["function_name"]]).get("EventSourceMappings",[])
 if len(all_maps) != 1:
     fail(f"expected exactly one preserved event-source mapping for function, found {len(all_maps)}")
@@ -395,7 +386,6 @@ def canonical_deleted(item,event_id,revision,seq):
         fail(f"deleted state for {event_id} is not exact tombstone shape: expected {expected}, got {item}")
 
 
-# The compat-v1 invocation path must still return the same result after the repair.
 compat_id=f"compat-{uuid.uuid4().hex[:12]}"
 compat_values=[{"k":"b","v":2},{"k":"a","v":[3,1]},f"x-{secrets.token_hex(4)}"]
 try:
@@ -423,7 +413,7 @@ other=f"grader-{tag}-other"
 poison_only=f"grader-{tag}-poison-only"
 for x in (entity,other,poison_only): delete_item(x)
 
-# Recover artifacts left by the broken handler.
+# Legacy started markers left by the broken handler.
 marker_good=f"grader-{tag}-marker-good"
 marker_bad=f"grader-{tag}-marker-poison"
 delete_item(marker_good); delete_item(marker_bad)
@@ -468,7 +458,7 @@ expect_no_receipt(entity,"live",2,seq(2))
 if get_item(poison_only) is not None:
     fail("standalone poison record left processed/idempotency state")
 
-# Full checkpoint replay must be stable and keep poison failed.
+# Replaying the whole batch changes nothing and poison stays failed.
 before_entity=get_item(entity); before_other=get_item(other)
 r2=invoke(batch1)
 expect_failures(r2,seq(2),seq(4))
@@ -488,17 +478,17 @@ expect_failures(r4)
 canonical_deleted(get_item(entity),entity,3,seq(7))
 expect_receipt(entity,"delete",3,seq(7))
 
-# Replaying the lower-order live revision 3 after the tombstone is a stale success, not a resurrection or conflict.
+# Replaying live revision 3 after the tombstone is a stale success.
 r4b=invoke([rec_upsert(entity,"v3",3,False,seq(3),name="MODIFY",old=("v2-bad",2,True))])
 expect_failures(r4b)
 canonical_deleted(get_item(entity),entity,3,seq(7))
-# Exact REMOVE replay is no-op; another REMOVE at equal order is a conflict.
+# Exact REMOVE replay is a no-op. A different REMOVE at equal order is a conflict.
 r4c=invoke([remove3]); expect_failures(r4c)
 remove3_conflict=rec_remove(entity,"v3",3,seq(8))
 r4d=invoke([remove3_conflict]); expect_failures(r4d,seq(8))
 canonical_deleted(get_item(entity),entity,3,seq(7))
 
-# REMOVE can carry poison in OldImage too; it must fail closed and write neither state nor receipt.
+# Poison in a REMOVE's OldImage fails without writing state or a receipt.
 poison_remove=rec_remove(entity,"v3",4,seq(81),poison=True)
 r4e=invoke([poison_remove]); expect_failures(r4e,seq(81))
 canonical_deleted(get_item(entity),entity,3,seq(7))
@@ -509,7 +499,7 @@ rev4=rec_upsert(entity,"v4-recreated",4,False,seq(9),name="INSERT")
 r5=invoke([rev4]); expect_failures(r5)
 canonical_live(get_item(entity),entity,"v4-recreated",4,seq(9))
 
-# Poison and intrinsic conflicts are permanent failures even after later state advances.
+# Poison and conflicts stay failed even after later revisions advance state.
 poison5=rec_upsert(entity,"v5-poison",5,True,seq(10),name="MODIFY",old=("v4-recreated",4,False))
 rev6=rec_upsert(entity,"v6",6,False,seq(11),name="MODIFY",old=("v5-poison",5,True))
 intrinsic=rec_upsert(entity,"v6-conflict",6,False,seq(12),name="MODIFY",old=("v6",6,False))
@@ -521,7 +511,7 @@ r6b=invoke([poison5,intrinsic])
 expect_failures(r6b,seq(10),seq(12))
 canonical_live(get_item(entity),entity,"v7",7,seq(13))
 
-# Structural integrity: mismatched Keys/image, unsupported operation, and malformed MODIFY.
+# Mismatched Keys/image, unsupported operation, and MODIFY without OldImage.
 key_bad=rec_upsert(entity,"v8-key-bad",8,False,seq(14),name="MODIFY",old=("v7",7,False),key_id=entity+"-other")
 old_id_bad=rec_upsert(entity,"v8-old-bad",8,False,seq(15),name="MODIFY",old=("v7",7,False,entity+"-old"))
 missing_old=rec_upsert(entity,"v8-missing-old",8,False,seq(16),name="MODIFY",old=None)
@@ -530,27 +520,27 @@ r7=invoke([key_bad,old_id_bad,missing_old,unsupported])
 expect_failures(r7,seq(14),seq(15),seq(16),seq(17))
 canonical_live(get_item(entity),entity,"v7",7,seq(13))
 
-# A failed record without a usable sequence number cannot be represented as a partial failure.
+# A failed record with no SequenceNumber can't be reported as a partial failure.
 no_seq=rec_upsert(entity,"v8-no-seq",8,True,seq(18),name="MODIFY",old=("v7",7,False))
 del no_seq["dynamodb"]["SequenceNumber"]
 invoke_expect_error([no_seq])
 canonical_live(get_item(entity),entity,"v7",7,seq(13))
 
-# Numeric revisions and same-revision delete precedence in one successful chain.
+# Numeric revision order and same-revision delete precedence in one batch.
 newid=f"grader-{tag}-multi"
 delete_item(newid)
 chain=[
     rec_upsert(newid,"m9",9,False,seq(20),name="INSERT"),
     rec_upsert(newid,"m10",10,False,seq(21),name="MODIFY",old=("m9",9,False)),
     rec_remove(newid,"m10",10,seq(22)),
-    # live order (10,0) is stale below tombstone order (10,1)
+    # stale: live (10,0) is below tombstone (10,1)
     rec_upsert(newid,"m10",10,False,seq(21),name="MODIFY",old=("m9",9,False)),
     rec_upsert(newid,"m11",11,False,seq(23),name="INSERT"),
 ]
 r8=invoke(chain); expect_failures(r8)
 canonical_live(get_item(newid),newid,"m11",11,seq(23))
 
-# Projection/receipt atomicity and legacy partial-pair reconciliation.
+# Legacy one-sided projection/receipt pairs.
 partial_state=f"grader-{tag}-partial-state"
 delete_item(partial_state)
 state_seq=seq(50)
@@ -642,13 +632,13 @@ canonical_live(get_item(txa),txa,"tx-a",40,seq(60))
 canonical_live(get_item(txb),txb,"tx-b",41,seq(61))
 expect_receipt(txa,"live",40,seq(60),"tx-a")
 expect_receipt(txb,"live",41,seq(61),"tx-b")
-# Full group replay is inert.
+# Replaying the whole group changes nothing.
 before_txa=get_item(txa); before_txb=get_item(txb)
 tg2=invoke([txa_rec,txb_rec]); expect_failures(tg2)
 if get_item(txa)!=before_txa or get_item(txb)!=before_txb:
     fail("successful transaction-envelope replay changed projection state")
 
-# Poison in one member aborts the complete group: the good neighbour must not leak state/receipt.
+# Poison in one member aborts the whole group, including the good member.
 txid2=f"tx-{tag}-poison"
 txc=f"grader-{tag}-tx-c"; txd=f"grader-{tag}-tx-d"
 for x in (txc,txd): delete_item(x)
@@ -659,7 +649,7 @@ if get_item(txc) is not None or get_item(txd) is not None:
     fail("poisoned transaction envelope partially changed projection state")
 expect_no_receipt(txc,"live",50,seq(62)); expect_no_receipt(txd,"live",1,seq(63))
 
-# One immutable receipt conflict aborts the entire group before the other member can commit.
+# A receipt conflict on one member aborts the whole group.
 txid3=f"tx-{tag}-receipt"
 txe=f"grader-{tag}-tx-e"; txf=f"grader-{tag}-tx-f"
 for x in (txe,txf): delete_item(x)
@@ -675,7 +665,7 @@ expect_no_receipt(txe,"live",60,seqe)
 if get_receipt(txf,"live",61,seqf) != conflicting:
     fail("transaction group overwrote its pre-existing conflicting receipt")
 
-# Incomplete envelope is itself failed and must not be processed as a standalone record.
+# An incomplete envelope fails and is not processed as a standalone record.
 txid4=f"tx-{tag}-incomplete"
 txg=f"grader-{tag}-tx-g"; delete_item(txg)
 incomplete=rec_upsert(txg,"incomplete",70,False,seq(66),name="INSERT",tx=(txid4,0,2))
@@ -685,7 +675,7 @@ if get_item(txg) is not None:
 expect_no_receipt(txg,"live",70,seq(66))
 
 
-# Recheck frozen state after behavioral grading.
+# Recheck frozen state after the behavior tests.
 source_scan=aws_json(["dynamodb","scan","--table-name",S["source_table"],"--consistent-read"])
 source_items=sorted(source_scan.get("Items",[]), key=lambda x:json.dumps(x,sort_keys=True,separators=(",",":")))
 if len(source_items) != S["source_item_count"] or h(source_items) != S["source_items_sha256"]:

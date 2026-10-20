@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Check that nothing in the account still names the retired role.
-
-Passes when the Greengrass service-role association is unset or names a role that
-existed before setup finished, no IAM policy document names the retired role, the
-retired role has not been re-created, and the keep role is unchanged.
-"""
 import json
 import time
 import urllib.parse
@@ -25,7 +19,7 @@ gg = ck.client("greengrassv2")
 iam = ck.client("iam")
 
 def _doc(doc):
-    """IAM hands a policy document back either URL-encoded or already decoded."""
+    """IAM returns policy documents either URL-encoded or already decoded."""
     if isinstance(doc, str):
         try:
             return json.loads(urllib.parse.unquote(doc))
@@ -35,7 +29,7 @@ def _doc(doc):
 
 
 def _canon(x):
-    """AWS does not preserve array order inside a policy document, so list members are ordered too."""
+    """AWS does not preserve array order in policy documents, so sort lists too."""
     if isinstance(x, dict):
         return {k: _canon(v) for k, v in x.items()}
     if isinstance(x, list):
@@ -52,7 +46,7 @@ def _mentions(doc):
 
 
 def _predates_handover(role_name):
-    """True if the role exists and was created before setup finished."""
+    """True if the role exists and was created before setup finished (5s grace)."""
     try:
         cd = iam.get_role(RoleName=role_name)["Role"].get("CreateDate")
     except ClientError as e:
@@ -65,7 +59,6 @@ def _predates_handover(role_name):
 
 
 def _keep_unchanged():
-    """Fail if the keep role is missing or any of its recorded attributes changed."""
     try:
         now = iam.get_role(RoleName=KEEP)["Role"]
     except ClientError as e:
@@ -96,7 +89,7 @@ def _keep_unchanged():
             ck.require(_norm(cur) == _norm(doc),
                        "the inline policy %r of %s was rewritten; that role was to be left exactly as "
                        "handed over" % (pname, KEEP))
-    if KEEP_SURFACE:   # every mutable field, not just the policy documents
+    if KEEP_SURFACE:
         now_attached = []
         try:
             for pg in iam.get_paginator("list_attached_role_policies").paginate(RoleName=KEEP):
@@ -117,7 +110,6 @@ def _keep_unchanged():
 
 
 def _audit_account():
-    """Fail if any role, user, group or customer-managed policy document names the retired role."""
     try:
         for page in iam.get_paginator("get_account_authorization_details").paginate(
                 Filter=["Role", "User", "Group", "LocalManagedPolicy"]):

@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Check that the order-error alarm threshold is lowered and will not be reverted.
-
-Passes when the seeded alarm still exists on its namespace and metric with a
-GreaterThanOrEqualToThreshold comparison and a threshold in [1, 100], and no enabled
-EventBridge Scheduler schedule rewrites it with a threshold above 100.
-"""
 import json
 
 import checkkit as ck

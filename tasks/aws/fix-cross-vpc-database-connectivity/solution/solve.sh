@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Adds the peering routes in both route tables and allows TCP 5432 from the
-# prod-vpc CIDR on the primary database security group.
 set -euo pipefail
 REGION="${AWS_REGION:-us-east-1}"
 
@@ -24,7 +22,6 @@ PROD_CIDR = prod["CidrBlock"]
 SHARED_CIDR = shared["CidrBlock"]
 
 def custom_rt(vpc_id):
-    # The subnets are associated with a custom (non-main) route table; pick that one.
     rts = ec2.describe_route_tables(
         Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])["RouteTables"]
     custom = [rt for rt in rts
@@ -35,7 +32,6 @@ def custom_rt(vpc_id):
 PROD_RT = custom_rt(PROD_VPC)
 SHARED_RT = custom_rt(SHARED_VPC)
 
-# The active peering connection linking the two VPCs.
 peerings = ec2.describe_vpc_peering_connections(Filters=[
     {"Name": "status-code", "Values": ["active"]}])["VpcPeeringConnections"]
 peer = None
@@ -47,8 +43,7 @@ for p in peerings:
 assert peer, "no active peering connection between prod-vpc and shared-vpc"
 PEERING = peer["VpcPeeringConnectionId"]
 
-# The primary database SG in shared-vpc, identified by its Role tag
-# (Role=primary-database) rather than by name.
+# SG names are scrambled, so find the database SG by its Role tag.
 sgs = ec2.describe_security_groups(Filters=[
     {"Name": "vpc-id", "Values": [SHARED_VPC]},
     {"Name": "tag:Role", "Values": ["primary-database"]}])["SecurityGroups"]
@@ -66,14 +61,10 @@ def add_route(rt_id, dest_cidr):
         if e.response["Error"]["Code"] != "RouteAlreadyExists":
             raise
 
-# prod -> shared route
 add_route(PROD_RT, SHARED_CIDR)
-# shared -> prod return route (peering routes are needed in both directions)
 add_route(SHARED_RT, PROD_CIDR)
 
-# Allow the application tier to reach the primary database on 5432. Scoped to the prod VPC CIDR
-# rather than a cross-VPC security-group reference: same effect, without depending on VPC-peering
-# security-group referencing being enabled on this connection.
+# Use the prod CIDR so this works without cross-VPC security group referencing.
 try:
     ec2.authorize_security_group_ingress(
         GroupId=SHARED_RDS_SG,

@@ -1,9 +1,3 @@
-"""Check that none of the pilot's data remains in the bucket and the bucket still exists.
-
-Passes when the bucket exists, holds no objects, and the seeded multipart upload is
-no longer in progress. Parts of an in-progress upload are stored data that
-`list-objects-v2` does not return, so `list-multipart-uploads` is checked as well.
-"""
 import boto3
 import botocore
 import checkkit as ck
@@ -16,21 +10,19 @@ UPLOAD_KEY = seed["upload_key"]
 
 s3 = boto3.client("s3", region_name=R)
 
-# The bucket itself must still exist.
 try:
     s3.head_bucket(Bucket=BUCKET)
 except botocore.exceptions.ClientError:
     ck.require(False, "the bucket %s is gone — another team is taking it over, so only the pilot's data "
                       "inside it was in scope." % BUCKET)
 
-# The ordinary objects must be gone.
 objs = []
 for page in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET):
     objs += [o["Key"] for o in page.get("Contents", [])]
 ck.require(not objs, "the bucket %s still holds objects (%s) — the pilot's data was not removed."
                      % (BUCKET, ", ".join(sorted(objs)[:3])))
 
-# The seeded multipart upload must no longer be holding parts.
+# Parts of an in-progress multipart upload don't show up in list_objects_v2.
 uploads = []
 kw = {"Bucket": BUCKET}
 while True:

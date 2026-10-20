@@ -16,7 +16,6 @@ VOL = seed["volume_id"]
 
 ec2 = boto3.client("ec2", region_name=R)
 
-# The volume must be gone from the ordinary volume list.
 plain = []
 try:
     plain = ec2.describe_volumes(VolumeIds=[VOL]).get("Volumes", [])
@@ -29,7 +28,6 @@ ck.require(
     "the volume %s is still an ordinary volume in this account — it was not deleted." % VOL,
 )
 
-# The volume must not be held in the Recycle Bin either.
 rbin = boto3.client("rbin", region_name=R)
 covering = 0
 try:

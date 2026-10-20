@@ -14,7 +14,6 @@ QUEUE_ARN=$(aws sqs get-queue-attributes --queue-url "$QUEUE_URL" \
 SUB_ARN=$(aws sns list-subscriptions-by-topic --topic-arn "$TOPIC_ARN" \
   --query "Subscriptions[?Protocol=='sqs'].SubscriptionArn | [0]" --output text)
 
-# Point the queue policy's SourceArn condition at the current topic.
 python3 - "$QUEUE_ARN" "$TOPIC_ARN" > queue-policy.json <<'PY'
 import json
 import sys
@@ -36,12 +35,10 @@ PY
 aws sqs set-queue-attributes --queue-url "$QUEUE_URL" --attributes file://queue-policy.json
 rm -f queue-policy.json
 
-# Deliver the plain message body instead of the SNS notification envelope.
 aws sns set-subscription-attributes --subscription-arn "$SUB_ARN" \
   --attribute-name RawMessageDelivery --attribute-value true
 
-# SetSubscriptionAttributes replaces the whole FilterPolicy, so read the current
-# policy and change only the priority clause.
+# SetSubscriptionAttributes replaces the whole FilterPolicy, so change only the priority clause.
 CURRENT_FP=$(aws sns get-subscription-attributes --subscription-arn "$SUB_ARN" \
   --query "Attributes.FilterPolicy" --output text)
 python3 - "$CURRENT_FP" > filter-fix.json <<'PY'

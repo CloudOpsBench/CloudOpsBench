@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Replaces the state machine definition with a corrected JSONata transform,
-# publishes one version for `live` and a distinct one for `audit`, and repoints
-# both aliases.
 set -euo pipefail
 
 SM_NAME="batch-settlement"

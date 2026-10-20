@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Apply Terraform to publish the new build and move the `live` alias, then
-# repoint the SQS event-source mapping from the old numbered version to the alias.
 set -euo pipefail
 AWS_REGION="${AWS_REGION:?AWS_REGION required}"
 export AWS_DEFAULT_REGION="$AWS_REGION"

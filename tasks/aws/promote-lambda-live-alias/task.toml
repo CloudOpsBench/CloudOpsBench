@@ -1,10 +1,19 @@
 [task]
 name = "promote-lambda-live-alias"
-description = "Publish a new Lambda build and cut the live alias over to it."
+description = "Publish a new Lambda build and cut the live alias over to it"
 
 [metadata]
-initial_state_description = "Terraform manages an order processor Lambda function and its live alias, currently pointing at the old published build. The workspace contains new handler code ready for deployment. An out-of-band SQS event-source mapping still invokes the old numbered version."
-outcome_description = "The live alias resolves to code different from the recorded original build, while the existing SQS event-source mapping remains active and resolves to the same code as the alias. The rollout must not strand the consumer on the previous version."
-criteria_descriptions = ["The live alias resolves to a code hash different from the recorded old hash.", "A function event-source mapping exists with state Enabled, Creating, or Updating.", "The event-source mapping target resolves to the same code hash as the live alias."]
+initial_state_description = """
+Terraform manages an order processor Lambda function and its live alias, which points at the old published build.
+The workspace has new handler code ready to deploy.
+An SQS event-source mapping created outside Terraform invokes the old numbered version."""
+outcome_description = """
+The live alias resolves to code different from the recorded original build.
+The SQS event-source mapping is still active and resolves to the same code as the alias, so the consumer is not left on the old version."""
+criteria_descriptions = [
+  "the live alias resolves to a code hash different from the recorded old hash",
+  "the function's event-source mapping exists and is Enabled, Creating, or Updating",
+  "the event-source mapping target resolves to the same code hash as the live alias",
+]
 keywords = ["aws", "terraform", "lambda", "sqs", "deployment"]
 extra_tools = []

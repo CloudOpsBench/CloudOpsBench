@@ -6,7 +6,6 @@ set -uo pipefail
 zone="us-east-1"
 me=$(aws sts get-caller-identity --query Account --output text)
 
-# SNS: replace any topic policy that names Principal "*" with an account-only policy.
 for t in $(aws sns list-topics --region "$zone" --query 'Topics[].TopicArn' --output text | tr '\t' '\n' | grep ':vera3-' || true); do
   doc=$(aws sns get-topic-attributes --topic-arn "$t" --region "$zone" --query 'Attributes.Policy' --output text 2>/dev/null)
   case "$doc" in

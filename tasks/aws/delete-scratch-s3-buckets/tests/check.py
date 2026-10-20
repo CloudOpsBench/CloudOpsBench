@@ -1,9 +1,4 @@
-"""Check that every vera2 S3 bucket has been deleted.
-
-Passes when none of the seeded general-purpose buckets appear in list-buckets and none of
-the seeded directory buckets appear in list-directory-buckets. A failed listing call
-raises instead of being treated as an empty result.
-"""
+"""Check that the seeded general-purpose and directory buckets are gone."""
 import boto3
 import checkkit as ck
 

@@ -65,7 +65,6 @@ def alias_env():
     return (cfg.get("Environment") or {}).get("Variables", {}).get(SETTING)
 
 
-# Invoke the Lambda exporter through its live alias.
 marker = uuid.uuid4().hex[:12]
 served = None
 delivered = False
@@ -117,7 +116,6 @@ ck.require(
     "under its live alias."
     % (invoke_note, DB, TABLE, TARGET, where(served), latest_env(), FN, ALIAS))
 
-# Batch job definition.
 jds = batch.describe_job_definitions(
     jobDefinitionName=JOBDEF, status="ACTIVE").get("jobDefinitions", [])
 ck.require(
@@ -140,7 +138,6 @@ ck.require(
     "scope." % (latest_jd["revision"], JOBDEF, SETTING, where(jd_stream), DB, TABLE, TARGET,
                 JOBDEF, SETTING))
 
-# Glue job.
 job = glue.get_job(JobName=GLUEJOB)["Job"]
 args = dict(job.get("DefaultArguments") or {})
 args.update(job.get("NonOverridableArguments") or {})  # non-overridable wins at run time
@@ -153,7 +150,6 @@ ck.require(
     "instruction.md puts every exporter carrying %s in scope."
     % (GLUEJOB, SETTING, where(glue_stream), DB, TABLE, TARGET, GLUEJOB, SETTING))
 
-# CodeBuild exporter in the secondary region.
 cb = ck.client("codebuild", region_name=SECONDARY)
 projects = cb.batch_get_projects(names=[CBPROJECT]).get("projects", [])
 ck.require(
@@ -176,7 +172,6 @@ ck.require(
     % (CBPROJECT, SECONDARY, SETTING, where(cb_stream), DB, TABLE, TARGET, seed["region"],
        SECONDARY, SETTING))
 
-# The delivery stream's role must be able to write to the table location.
 iam = ck.client("iam")
 s3 = ck.client("s3")
 bucket, _, key_prefix = TARGET.split("://", 1)[1].partition("/")
@@ -279,7 +274,6 @@ for stream in sorted({served, jd_stream, glue_stream, cb_stream}):
         % (stream, TARGET, role.split("/")[-1], "; ".join(missing), key_prefix, wait,
            buffer_seconds(stream)))
 
-# The seeded delivery streams must be unchanged.
 for name, snapshot in seed["stream_snapshots"].items():
     try:
         desc = fh.describe_delivery_stream(
@@ -308,7 +302,6 @@ for name, snapshot in seed["stream_snapshots"].items():
         "prefix; repointing an existing stream is not an accepted way to satisfy the routing "
         "requirement." % (name, json.dumps(addressing(snapshot))[:600], json.dumps(now)[:600]))
 
-# The catalog table must be unchanged.
 VOLATILE = {"CreateTime", "UpdateTime", "VersionId", "CreatedBy", "LastAccessTime",
             "LastAnalyzedTime", "IsRegisteredWithLakeFormation", "CatalogId",
             "DatabaseName", "Status", "FederatedTable"}

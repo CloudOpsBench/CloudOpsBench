@@ -1,9 +1,4 @@
-"""Check that every seeded vera2 ACM certificate has been deleted.
-
-Passes when describe-certificate reports ResourceNotFoundException for each
-certificate ARN in the seed state. One seeded certificate is RSA-4096, which
-`acm list-certificates` omits unless --includes keyTypes=... is passed.
-"""
+"""Check that every seeded vera2 ACM certificate is gone (describe-certificate returns ResourceNotFoundException)."""
 import boto3, botocore
 import checkkit as ck
 

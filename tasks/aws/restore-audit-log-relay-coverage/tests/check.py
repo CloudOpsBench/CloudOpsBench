@@ -53,7 +53,6 @@ for r in REGIONS:
             f"keeps the name it has now",
         )
 
-# Write marked log lines to every /svc/ log group and read them back from the audit streams.
 MARK = secrets.token_hex(6)
 PROBE = {r: f"/svc/relay-probe-{secrets.token_hex(6)}" for r in REGIONS}
 
@@ -255,7 +254,6 @@ if vendor_hits:
         f"/svc/ log group's must"
     )
 
-# Probe groups must be covered without subscription filters of their own.
 for r in REGIONS:
     pf = logs[r].describe_subscription_filters(logGroupName=PROBE[r])["subscriptionFilters"]
     ck.require(
@@ -268,7 +266,6 @@ for r in REGIONS:
         f"Delivery is graded separately and is not what failed here",
     )
 
-# Log groups, streams and the relay role must keep their seeded identity and settings.
 for r in REGIONS:
     for g in RELAYED[r] + ([VENDOR] if r == REGION else []):
         cur = present[r].get(g)

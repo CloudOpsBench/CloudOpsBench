@@ -4,17 +4,20 @@ description = "Wire tagged CloudWatch alarms back to their SNS notification topi
 
 [metadata]
 initial_state_description = """
-The account contains CloudWatch alarms tagged App=nightbell that must notify an SNS topic also tagged App=nightbell. A failover drill removed the alarm actions from at least one of those alarms, leaving on-call deaf to real breaches. The account also contains a decoy alarm tagged App=drill and other unrelated alarms that must not be touched."""
-
+Two regions each have an SNS topic tagged App=nightbell.
+Three CloudWatch alarms are tagged App=nightbell: two metric alarms in the home region and one composite alarm in the other region.
+A failover drill left only one of them with an alarm action.
+A decoy alarm tagged App=drill and other unrelated alarms are also present."""
 outcome_description = """
-Every CloudWatch alarm tagged App=nightbell in every region notifies the SNS topic tagged App=nightbell in its region. All other alarms — including the App=drill decoy and any unrelated alarms — retain their original configuration exactly as it was before the fix."""
-
+Every alarm tagged App=nightbell, in any region, has its region's App=nightbell topic as an alarm action.
+The App=drill decoy and all other alarms keep their original configuration and tags."""
 criteria_descriptions = [
-  "every CloudWatch alarm tagged App=nightbell has at least one alarm action pointing to the SNS topic tagged App=nightbell in the same region",
-  "no App=nightbell alarm is missing its notification action",
-  "the App=drill decoy alarm and all other unrelated alarms are unchanged",
-  "the fix works across all regions where App=nightbell alarms exist, including cross-region composite alarms",
+  "both seeded App=nightbell topics still exist and keep their App=nightbell tag",
+  "each seeded App=nightbell alarm still exists, has its region's seeded topic as an alarm action, and keeps its App=nightbell tag",
+  "the App=drill decoy alarm still exists with its original configuration and tags",
+  "every metric or composite alarm tagged App=nightbell in any region has an App=nightbell topic from its own region as an alarm action",
+  "at least three App=nightbell alarms are found",
+  "every other alarm recorded at setup still exists with its original configuration and tags",
 ]
-
 keywords = ["aws", "cloudwatch", "sns", "alerting", "multi-region"]
 extra_tools = []

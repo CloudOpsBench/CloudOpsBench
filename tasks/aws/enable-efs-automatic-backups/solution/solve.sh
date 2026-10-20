@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enable automatic backups on every vera2 EFS file system in every region.
+# Enables automatic backups on every vera2 EFS file system in every region.
 set -euo pipefail
 python3 - <<'PY'
 import boto3

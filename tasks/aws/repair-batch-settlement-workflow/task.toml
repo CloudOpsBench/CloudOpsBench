@@ -1,25 +1,34 @@
 [task]
 name = "repair-batch-settlement-workflow"
-description = "Repair the batch-settlement Step Functions workflow in place, publish two repaired versions, and route the live and audit aliases to different repaired versions."
+description = "Repair the batch-settlement Step Functions workflow and route the live and audit aliases to two different repaired versions"
 
 [metadata]
-initial_state_description = "Setup creates an IAM execution role and a STANDARD Step Functions state machine named batch-settlement, written in JSONata as two Pass states: one assigns a computed result and one emits batchId, invoices, and summary. One version is published and both the live and audit aliases route 100% to it. The seeded expression ignores inventory, applies each SKU rebate per line instead of cumulatively across the batch, ignores the SAVE20 coupon and the discount cap, computes the taxable base without rebate or discount, spreads batch credit over all orders with independent rounding and no eligibility threshold or cap, and decides free shipping on net before credit."
-outcome_description = "The live and audit aliases each route all traffic to a single published version, the two versions are different, and neither is the seeded version. Both versions keep the original execution role, the JSONata query language, and the two-Pass-state design with no task resources, and executions through both aliases return the existing batchId, invoices, and summary shape with values matching the settlement rules in the instruction."
+initial_state_description = """
+batch-settlement is a STANDARD Step Functions state machine with an IAM execution role, written in JSONata as two Pass states.
+The first assigns a computed result and the second emits batchId, invoices, and summary.
+One version is published, and the live and audit aliases both route 100% to it.
+The seeded expression ignores inventory, applies each SKU rebate per line instead of across the batch, and ignores the SAVE20 coupon and the discount cap.
+It also computes the taxable base without rebate or discount, spreads batch credit over all orders with independent rounding and no eligibility threshold or cap, and decides free shipping on net before credit."""
+outcome_description = """
+The live and audit aliases each route all traffic to one published version.
+The two versions differ from each other and from the seeded version.
+Both keep the original execution role, JSONata, and the two-Pass-state design with no Resource fields.
+Executions through both aliases return the same batchId, invoices, and summary shape, with values that follow the settlement rules in the instruction."""
 criteria_descriptions = [
-    "The live alias and the audit alias each have a routing configuration with exactly one entry at weight 100.",
-    "Neither alias routes to the seeded version.",
-    "The live and audit aliases route to two different version ARNs.",
-    "The versions behind both aliases use the original execution role.",
-    "The definitions behind both aliases declare JSONata as the query language.",
-    "Each definition has exactly two states.",
-    "In each definition the start state is a Pass state that assigns a variable named result and transitions to another state in the definition.",
-    "In each definition exactly one state is terminal, and it is a Pass state with an Output object.",
-    "No state in either definition has a Resource field.",
-    "Every graded execution started through an alias reaches SUCCEEDED within the polling window of about one minute.",
-    "Each execution output has exactly the top-level keys batchId, invoices, and summary, with the input batchId and one invoice per input order.",
-    "Each invoice has exactly the expected set of keys, and every value matches the grader's reference settlement calculation, with integers exact and decimals within 0.004.",
-    "The summary has exactly the expected set of keys, and every value matches the reference calculation under the same tolerances.",
-    "These output checks hold for five fixed batches, including an empty batch, a fully backordered order, repeated SKUs within and across orders, the discount cap, an unknown tier, and a SKU absent from inventory, and for six pseudo-randomly generated batches with a fixed seed, with cases alternating between the live and audit aliases.",
+  "the live and audit aliases each have exactly one routing entry, at weight 100",
+  "neither alias routes to the seeded version",
+  "the live and audit aliases route to two different version ARNs",
+  "both versions use the original execution role",
+  "both definitions declare JSONata as the query language",
+  "each definition has exactly two states",
+  "in each definition the start state is a Pass state that assigns a variable named result and moves to another state in the definition",
+  "in each definition exactly one state is terminal, and it is a Pass state with an Output object",
+  "no state in either definition has a Resource field",
+  "every graded execution through an alias reaches SUCCEEDED within about one minute",
+  "each execution output has exactly the keys batchId, invoices, and summary, with the input batchId and one invoice per input order",
+  "each invoice has exactly the expected keys and matches the grader's reference calculation, with integers and booleans exact and decimals within 0.004",
+  "the summary has exactly the expected keys and matches the reference calculation with the same tolerances",
+  "the output checks run on five fixed batches and six seeded random batches, alternating between the live and audit aliases",
 ]
 keywords = ["aws", "step-functions", "jsonata", "iam", "debugging", "deployment"]
 extra_tools = []

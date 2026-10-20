@@ -41,7 +41,6 @@ def scrub_secret(sm, secret_id):
                                                RemoveFromVersionId=version)
 
 
-# The home-region secret first.
 scrub_secret(sm_home, arn)
 
 try:

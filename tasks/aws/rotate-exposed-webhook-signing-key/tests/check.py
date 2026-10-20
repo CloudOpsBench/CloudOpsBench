@@ -61,7 +61,6 @@ ck.require(EXPOSED not in current,
            "the one the secret held when the task started, readable then with a plain "
            "get_secret_value." % NAME)
 
-# Every version stage the us-east-1 secret still carries.
 stages = sorted({st for sts in sm[EAST].describe_secret(SecretId=EAST_ARN)
                  ["VersionIdsToStages"].values() for st in sts})
 for stage in stages:
@@ -181,7 +180,6 @@ for region, families in ((EAST, seed["east_families"]), (WEST, seed["west_famili
                   region, "ecs:DescribeTaskDefinition on the family in %s" % region,
                   entry["valueFrom"])
 
-# The payouts team's secret: value and version stages.
 other_now = secret_string(seed["other_arn"], EAST)
 ck.require(other_now is not None and seed["other_value"] in other_now,
            "the secret %s no longer returns the value it was seeded with. instruction.md "
