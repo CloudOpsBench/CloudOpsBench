@@ -1,0 +1,29 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main, v1.0]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Static checks
+        run: python3 scripts/validate.py
+      - name: Validator unit tests
+        run: python3 -m unittest discover -s scripts -p 'test_lifecycle_validator.py'
+      - name: Shell syntax
+        run: find tasks -name '*.sh' -print0 | xargs -0 -n1 bash -n

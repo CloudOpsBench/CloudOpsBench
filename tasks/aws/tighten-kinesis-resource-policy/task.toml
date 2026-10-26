@@ -1,10 +1,25 @@
 [task]
 name = "tighten-kinesis-resource-policy"
-description = "Tighten a Kinesis data stream's resource policy to least privilege."
+description = "Tighten a Kinesis data stream's resource policy to least privilege"
 
 [metadata]
-initial_state_description = "Terraform manages a Kinesis stream with a broad account-root resource policy and producer, analytics consumer, and outsider IAM roles. The roles have no Kinesis identity permissions. An enhanced-fan-out consumer registration exists outside Terraform and is discoverable through the Kinesis API."
-outcome_description = "The named producer can write to the stream and the analytics consumer retains classic data-plane read access, while the outsider can neither read nor write. Restricting the broad resource policy must preserve the legitimate consumer rather than silently severing it."
-criteria_descriptions = ["The configured Kinesis stream exists and can be described by the verifier.", "The assumed producer role can successfully issue PutRecord against the stream.", "The assumed analytics consumer role can describe the stream, obtain a shard iterator, and get records.", "The assumed outsider role cannot read records from the stream.", "The assumed outsider role cannot issue PutRecord against the stream."]
+initial_state_description = """
+Terraform manages a Kinesis stream with an account-root resource policy granting broad
+access, plus producer, analytics consumer and outsider IAM roles that have no Kinesis
+identity permissions. An enhanced fan-out consumer is registered outside Terraform and is
+visible through the Kinesis API.
+"""
+outcome_description = """
+The producer can write to the stream, the analytics consumer can still read it through the
+classic data-plane API, and the outsider can neither read nor write. Tightening the policy
+must not cut off the consumer.
+"""
+criteria_descriptions = [
+  "the Kinesis stream exists and can be described",
+  "the producer role, once assumed, can PutRecord to the stream",
+  "the analytics consumer role, once assumed, can describe the stream, get a shard iterator and get records",
+  "the outsider role, once assumed, cannot read records from the stream",
+  "the outsider role, once assumed, cannot PutRecord to the stream",
+]
 keywords = ["aws", "terraform", "kinesis", "iam", "security", "least-privilege"]
 extra_tools = []

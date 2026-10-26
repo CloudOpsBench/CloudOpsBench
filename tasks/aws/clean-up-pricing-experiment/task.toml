@@ -1,0 +1,41 @@
+[task]
+name        = "clean-up-pricing-experiment"
+description = "Remove a finished pricing experiment, including the query results it left in a shared bucket"
+
+[metadata]
+initial_state_description = """
+A finished Q1 price elasticity test still has resources in the account. Its Athena workgroup writes
+query results to a prefix in a shared, versioned analytics results bucket, so those result sets are a
+copy of the customer data the experiment queried. Finance's weekly revenue reporting writes to a
+separate prefix in the same bucket and has its own access point, workgroup, secret and IAM role. The
+experiment also has an S3 access point on its prefix, an unfinished multipart upload of a cohort
+export, a pricing API key in Secrets Manager and its own IAM query role.
+"""
+
+outcome_description = """
+No object versions, delete markers or unfinished multipart uploads remain under the experiment's
+prefix. Its access point, Athena workgroup and IAM role are deleted, and the pricing API key is
+force-deleted so it cannot be restored. Deleting the workgroup alone does not remove the result sets,
+which live in the shared bucket. The bucket still exists, and Finance keeps its results, access
+point, workgroup, warehouse DSN secret and IAM role.
+"""
+
+criteria_descriptions = [
+  "keeper: the shared analytics results bucket still exists",
+  "keeper: Finance's weekly revenue results are still under their prefix",
+  "keeper: no delete marker was written over Finance's prefix",
+  "keeper: Finance's S3 access point still exists",
+  "keeper: Finance's Athena workgroup still exists",
+  "keeper: Finance's warehouse DSN secret still exists and is not scheduled for deletion",
+  "keeper: Finance's reporting IAM role still exists",
+  "no object versions remain under the experiment's prefix",
+  "no delete markers remain under the experiment's prefix",
+  "no unfinished multipart upload remains under the experiment's prefix",
+  "the experiment's S3 access point no longer exists",
+  "the experiment's Athena workgroup no longer exists",
+  "the pricing API key secret no longer resolves (force-deleted, not scheduled for deletion)",
+  "the experiment's query IAM role no longer exists",
+]
+
+keywords    = ["decommissioning", "s3", "athena", "versioning", "data-retention"]
+extra_tools = []

@@ -1,0 +1,28 @@
+[task]
+name = "repair-dynamodb-stream-poison-pill-consumer"
+description = "Repair a DynamoDB Streams consumer so projection state and receipts are written atomically and transaction envelopes commit all-or-none"
+
+[metadata]
+initial_state_description = """
+A tagged Python Lambda consumes a NEW_AND_OLD_IMAGES DynamoDB stream and maintains a projection table and a table of immutable mutation receipts.
+The handler treats event_id as the idempotency key, leaves started markers behind, ignores receipts and transaction envelopes, and the event-source mapping has unsafe failure settings.
+The package also has a healthy compat-v1 path."""
+outcome_description = """
+Only lambda_function.py and the existing mapping's failure controls change.
+Standalone and transaction records keep projection state monotone and receipts immutable.
+Complete transaction groups commit atomically or fail with no partial state, legacy one-sided pairs are reconciled, and poison, malformed or conflicting records stay failed.
+Frozen infrastructure and package state is unchanged."""
+criteria_descriptions = [
+  "the DynamoDB tables, source items, Lambda config, versions, aliases, IAM role, S3 archive and compat-* receipts match their seeded state, before and after the behavior tests",
+  "the function and the source stream each have exactly one mapping, the original one, with its static fields and filter unchanged",
+  "the compat-v1 direct invocation returns the expected result, and the package changes only in lambda_function.py",
+  "the mapping is Enabled with ReportBatchItemFailures, bisection on error, exactly 2 retries, a 3600-second maximum record age, and the archive bucket as OnFailure destination",
+  "projection state follows live=(revision,0) and REMOVE=(revision,1) ordering, with exact replays inert, stale deliveries succeeding without change, and equal-order conflicts failing",
+  "every state-advancing mutation writes its receipt atomically, one-sided legacy pairs and started markers are reconciled, and conflicting receipts block the write and are not overwritten",
+  "a complete tx_id envelope commits every member's projection and receipt together, and replaying it changes nothing",
+  "an incomplete envelope, or one with a poison or conflicting member, fails every member and writes no projection or receipt state",
+  "failed records are reported by SequenceNumber, and a failed record without one fails the whole invocation",
+  "overlapping invocations converge, with one winner on an equal-order conflict, REMOVE winning a same-revision race, and the higher revision winning otherwise",
+]
+keywords = ["dynamodb", "dynamodb-streams", "lambda", "transaction", "TransactWriteItems", "poison-pill", "idempotency", "revision", "receipt", "partial-batch-response", "ReportBatchItemFailures", "concurrency", "s3"]
+extra_tools = []

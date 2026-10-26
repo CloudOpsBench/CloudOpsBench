@@ -1,0 +1,22 @@
+[task]
+name = "revoke-external-access-metrics-collector"
+description = "Find every vera2 resource reachable from outside the account and restrict it to the account"
+
+[metadata]
+initial_state_description = """
+A vera2- SNS topic in us-east-1 has a topic policy that lets any AWS principal subscribe. A
+vera2- Serverless Application Repository application has an application policy that grants
+Deploy to all principals. Describing the application does not show that policy; only the
+separate get-application-policy call returns it.
+"""
+outcome_description = """
+Neither the SNS topic nor the Serverless Application Repository application has an Allow
+statement for the wildcard principal without a condition. Fixing only the SNS topic leaves
+the application publicly deployable and fails.
+"""
+criteria_descriptions = [
+  "the seeded Serverless Application Repository application's policy has no unconditioned Allow for the wildcard principal, or the policy can no longer be read",
+  "the seeded SNS topic's policy has no unconditioned Allow for the wildcard principal, or the topic's attributes can no longer be read",
+]
+keywords = ["aws", "sns", "serverlessrepo", "security", "least-privilege"]
+extra_tools = []

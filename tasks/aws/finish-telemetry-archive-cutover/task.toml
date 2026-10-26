@@ -1,0 +1,49 @@
+[task]
+name = "finish-telemetry-archive-cutover"
+description = "Finish a partial archive cutover so nothing writes to the retired bucket"
+
+[metadata]
+
+initial_state_description = """
+The retired telemetry archive bucket and its replacement both exist in us-east-1. The
+replacement already holds copied data, and a Parameter Store record says the cutover is
+complete. Several producers still write into the retired bucket. These are a Firehose
+delivery stream, a scheduled DataSync task, replication rules on two ingest buckets, a VPC
+flow log in a second region, one bucket's server access logs, and an Athena workgroup in the
+second region that stores query results there. The replication IAM role only allows writes to
+its original destinations, so it cannot write to the replacement bucket. A compliance
+replication feed and a second DataSync task that already writes to the replacement are not
+part of the work."""
+
+outcome_description = """
+No producer in the account writes new objects into the retired archive bucket, and the
+bucket still exists with its original objects. Each producer does the same work against the
+replacement bucket instead of stopping. Buckets that replicated into the retired archive now
+replicate into the replacement under the same filter, and objects arrive there. The
+compliance replication feed and the unrelated DataSync task are unchanged."""
+
+criteria_descriptions = [
+  "a probe object written to each ingest bucket never appears in the retired archive bucket",
+  "a probe object written to each ingest bucket reaches the compliance bucket within 400 seconds",
+  "a probe object written to each ingest bucket reaches the replacement archive bucket within 400 seconds",
+  "every object version seeded into the retired archive bucket still reads back with its original ETag",
+  "no Firehose delivery stream in either region has an S3 destination on the retired archive bucket",
+  "no DataSync task in either region has a destination location in the retired archive bucket",
+  "no enabled replication rule on any bucket has the retired archive bucket as its destination",
+  "each of the two ingest buckets has an enabled rule replicating into the replacement archive, identical to its seeded archive rule apart from destination bucket, ID and priority",
+  "telemetry-raw-stream exists, is ACTIVE and delivers to the replacement bucket",
+  "telemetry-raw-stream keeps every seeded destination setting apart from its bucket and role, including the raw/ prefix",
+  "a DataSync task named partner-drop-nightly exists with its original source location, schedule and exclude filters, and writes to the same path in the replacement bucket",
+  "partner-drop-nightly keeps every other seeded task setting",
+  "no VPC flow log in either region delivers into the retired archive bucket",
+  "the seeded VPC flow log delivers to the replacement bucket under its original prefix with every other seeded setting unchanged",
+  "no bucket writes its server access logs into the retired archive bucket",
+  "the ingest bucket writes its server access logs into the replacement bucket under its original prefix",
+  "no Athena workgroup in either region stores query results in the retired archive bucket",
+  "the seeded Athena workgroup is ENABLED and stores results in the replacement bucket under its original path",
+  "the DataSync task analytics-export-daily is unchanged from its seeded configuration",
+  "every replication rule delivering to the compliance bucket is unchanged from its seeded configuration",
+]
+
+keywords = ["aws", "s3", "firehose", "datasync", "replication", "athena", "migration", "multi-region"]
+extra_tools = []

@@ -1,0 +1,13 @@
+[task]
+name = "disable-alarm-actions-for-maintenance"
+description = "Disable alarm actions on all vera2 CloudWatch alarms before a maintenance window"
+
+[metadata]
+initial_state_description = "Setup creates two vera2- metric alarms (CPU and memory utilization) and a vera2- composite alarm that fires when either is in ALARM, all with actions enabled. A default describe-alarms call does not return composite alarms."
+outcome_description = "All three vera2 alarms still exist and have ActionsEnabled set to false. They must be silenced, not deleted."
+criteria_descriptions = [
+  "each of the two seeded metric alarms still exists with actions disabled",
+  "the seeded composite alarm still exists with actions disabled",
+]
+keywords = ["aws", "cloudwatch", "alarms", "maintenance"]
+extra_tools = []

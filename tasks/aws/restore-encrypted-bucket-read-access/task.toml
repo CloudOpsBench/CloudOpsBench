@@ -1,0 +1,29 @@
+[task]
+name = "restore-encrypted-bucket-read-access"
+description = "Find why an application role gets AccessDenied reading the reports data bucket and restore its read access within the security team's constraints"
+
+[metadata]
+initial_state_description = """
+A ciph-data- bucket uses SSE-KMS default encryption with a customer managed key, and a
+ciph-archive- bucket uses SSE-S3. Each holds reports/q1.txt. The ciph-app- role has an inline
+policy granting the same S3 read access to both buckets but no kms:Decrypt on the key. The role's
+permissions boundary also allows only S3 reads, so adding kms:Decrypt to the identity policy alone
+does not fix it. A TICKET.md describing the incident and constraints is in the workspace."""
+outcome_description = """
+The role's inline policy and its permissions boundary both allow kms:Decrypt scoped to the data
+bucket's key, so the role can read the encrypted object. The object keeps its original key, the
+boundary stays attached without a broad wildcard grant, both policies keep the S3 read access, and
+the archive bucket's encryption is unchanged."""
+criteria_descriptions = [
+  "the data bucket object reports/q1.txt is still SSE-KMS encrypted",
+  "that object is still encrypted with the original customer managed key",
+  "an inline policy on the role allows kms:Decrypt (or kms:*) on a resource naming the specific key, not *",
+  "an inline policy on the role still allows s3:GetObject on the data bucket",
+  "the role still has a permissions boundary attached",
+  "the boundary's default version allows kms:Decrypt (or kms:*) on a resource naming the specific key, not *",
+  "the boundary has no Allow statement combining action * or kms:* with resource *",
+  "the boundary still allows s3:GetObject (or s3:*) on the data bucket",
+  "if the archive bucket has a default encryption configuration, its algorithm is still AES256",
+]
+keywords = ["aws", "s3", "kms", "iam", "security", "least-privilege"]
+extra_tools = []

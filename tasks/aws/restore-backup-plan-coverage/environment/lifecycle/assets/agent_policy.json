@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Allow",
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoBackupJobs",
+      "Effect": "Deny",
+      "Action": [
+        "backup:StartBackupJob",
+        "backup:StartCopyJob"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

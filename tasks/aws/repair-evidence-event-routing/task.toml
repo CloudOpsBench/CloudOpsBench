@@ -1,0 +1,40 @@
+[task]
+name = "repair-evidence-event-routing"
+description = "Repair a compliance evidence pipeline where none of the sources reach the archiver queue"
+
+[metadata]
+
+initial_state_description = """
+A compliance evidence pipeline has never delivered a record and has logged no error, dead-letter or
+failed-invocation signal. The evidence-store bucket emits to EventBridge, but its capture rule sits
+on a custom platform bus where S3 events never arrive. The archiver queue's EventBridge grant is
+pinned by an aws:SourceArn condition to that rule's current ARN. Three other sources also fail to
+reach the queue: an intake-alert SNS topic with no subscription or queue grant, a recorder rule with
+no target, and a sealer state machine that sends its output to a dead-letter queue named by a stale
+SSM parameter. A separate retention flow on the same bus works and must keep working."""
+
+outcome_description = """
+Objects written to the evidence bucket, alerts published to the intake topic, recorded-evidence
+events on the platform bus and sealer state machine runs all produce a record in the archiver queue.
+Object events still go through EventBridge, not a direct bucket notification. Objects that were in
+the bucket before the repair are also archived, replayed after the repaired route was live, because
+events emitted before a route carries traffic are dropped. The evidence-ingest role can still send
+to the queue, the retention flow still delivers to its own queue, and nothing routes to the
+dead-letter queue. Any routing shape that does this passes."""
+
+criteria_descriptions = [
+  "the evidence-ingest role can still send to the archiver queue, with the queue policy and its identity policy evaluated together over TLS",
+  "the bucket still emits object events to EventBridge and has no direct queue, topic or Lambda notification",
+  "the platform bus and the retention-tagger rule still exist, and the rule is enabled and targets the retention-worker queue",
+  "an acme.evidence EvidenceSealed event published on the platform bus still reaches the retention-worker queue",
+  "an alert published to the intake-alert SNS topic reaches the archiver queue",
+  "an acme.evidence EvidenceRecorded event published on the platform bus reaches the archiver queue",
+  "running the evidence-sealer state machine puts its record in the archiver queue",
+  "a newly written object in the evidence bucket produces a message in the archiver queue",
+  "objects under two per-run random prefixes and under intake/ each produce their own archive record",
+  "every object that was in the bucket before the repair is represented in the archiver queue",
+  "nothing routes evidence to the dead-letter queue, whether the sealer definition, an EventBridge rule on either bus or a topic subscription",
+]
+
+keywords = ["compliance", "eventbridge", "silent-failure", "multi-source", "backfill", "ordering"]
+extra_tools = []

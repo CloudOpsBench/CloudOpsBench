@@ -1,0 +1,36 @@
+[task]
+name = "restore-audit-log-relay-coverage"
+description = "Restore full audit relay coverage across a fleet of application log groups"
+
+[metadata]
+
+initial_state_description = """
+CloudWatch Logs relays application logs into Kinesis streams named audit-relay-stream-* through a
+role named audit-relay-cwl-*. Five log groups sit under /svc/ in us-east-1. One has a subscription
+filter to the audit stream that forwards only lines containing ERROR, one has a filter pointing at
+a retired archive stream, one has no filter, one is in the Infrequent Access class and cannot carry
+a subscription filter, and one holds third-party vendor payloads. A sixth /svc/ log group runs in
+us-west-2 with its own audit stream. Neither region has an account-level subscription filter
+policy, so new log groups are not relayed.
+"""
+
+outcome_description = """
+All log events written to any /svc/ log group reach the audit stream in that group's region, with
+no filtering. This also holds for a /svc/ log group created later without any per-group setup.
+Events from the vendor callback log group never arrive. Every seeded /svc/ log group keeps its
+name and retention, the vendor log group is otherwise unchanged, and both audit streams and the
+relay role still exist unchanged. Any method is acceptable.
+"""
+
+criteria_descriptions = [
+  "a /svc/ log group the grader creates in each region afterwards delivers all four probe lines to that region's audit stream and has no subscription filter of its own",
+  "every other /svc/ log group in either region, seeded or created by the agent, delivers all four probe lines to its region's audit stream (four of eight message shapes are picked at random, each with a random token)",
+  "no line written to the vendor callback log group reaches the audit stream, checked after every other group's lines have arrived",
+  "all six seeded /svc/ log groups still exist under their original names",
+  "every seeded /svc/ log group keeps its seeded retention in days",
+  "the vendor callback log group keeps its creation time, log class, KMS key, data protection status and tags, and has no subscription filter",
+  "both audit streams keep their seeded ARNs and creation timestamps, and the relay role keeps its seeded RoleId",
+]
+
+keywords = ["aws", "cloudwatch-logs", "kinesis", "iam", "audit", "multi-region"]
+extra_tools = []

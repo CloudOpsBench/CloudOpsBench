@@ -1,0 +1,3 @@
+The vera2 pilot's S3 Express One Zone directory bucket is being retired. Its dataset belongs in the team's shared general-purpose bucket first. Both are in us-east-1: the pilot bucket is the vera2- directory bucket ending in -pilot--use1-az4--x-s3, and the destination ends in -shared.
+
+Consolidate the pilot dataset into the shared bucket under the same object keys, then leave the pilot bucket empty. Keep both buckets, preserve anything already in the shared bucket, and do not modify any other resources.

@@ -1,0 +1,62 @@
+[task]
+name = "retire-shared-automation-role"
+description = "Move everything that uses a legacy shared automation role onto its replacement, remove every reference to the legacy role, and delete it"
+
+[metadata]
+initial_state_description = """
+A legacy fleet-maintenance role is used by a nightly EventBridge Scheduler schedule, a
+CodeBuild project, a custom-bus rule target that starts a Step Functions state machine, an
+S3 replication configuration, an SSM maintenance window task, and the instance profile in
+the default version of an EC2 launch template. It is also the trusted principal of a
+release-gate role, a principal in a bucket policy statement shared with a compliance-scan
+role, and the value of an SSM parameter. The ops-runner replacement role is incomplete:
+its trust policy omits ssm.amazonaws.com and its inline policy lacks states:StartExecution
+on the state machine. A newer launch template version already uses a profile with the
+replacement role but is not the default. Unrelated neighbors must not change: an hourly
+schedule and a sibling SSM parameter that use a separate metrics role, the compliance-scan
+role's bucket access, and an artifact object.
+"""
+outcome_description = """
+The legacy role is deleted and every consumer runs through the replacement role, which
+trusts all six services involved and has the permissions those workloads need. No role
+trust policy, checked inline policy, bucket policy or runner-role parameter references the
+legacy role by ARN, name or unique id. The hourly metrics schedule, the reporting-role
+parameter, the compliance-scan role's artifact access, the artifact object, the queue and
+the other roles are unchanged.
+"""
+criteria_descriptions = [
+  "the legacy role no longer exists",
+  "the replacement, release-gate, compliance-scan, metrics-agent and state machine execution roles still exist",
+  "the nightly schedule exists and is ENABLED",
+  "the nightly schedule still targets the fleet events queue",
+  "the nightly schedule's target role is the replacement role",
+  "the nightly schedule's expression is unchanged",
+  "the nightly schedule's target input is unchanged",
+  "the hourly metrics schedule exists, is ENABLED, and still targets the queue with the metrics role",
+  "the inventory rule on the custom event bus exists and is ENABLED",
+  "the inventory rule's first target is still the inventory state machine",
+  "the inventory rule's first target uses the replacement role",
+  "the CodeBuild project exists and its service role is the replacement role",
+  "the launch template exists and its default version attaches an instance profile",
+  "that instance profile exists, is not empty, and contains the replacement role",
+  "the release-gate role's trust policy has no reference to the legacy role's ARN or name and no AROA unique-id principal",
+  "the release-gate trust policy lets the replacement role assume it, either by naming it or by trusting the account root or a wildcard with sts:AssumeRole allowed on the replacement's identity side",
+  "the artifact bucket policy, if present, has no reference to the legacy role's ARN or name and no AROA unique-id principal",
+  "the compliance-scan role can still read the artifact object through the bucket policy or its identity policies",
+  "the replacement role can read the artifact object through the bucket policy or its identity policies",
+  "the artifact object exists with its original contents",
+  "the artifact bucket's replication configuration uses the replacement role",
+  "a replication rule is still Enabled with the mirror bucket as its destination",
+  "the maintenance window exists and is enabled",
+  "the maintenance window still has a registered task, and the first task's service role is the replacement role",
+  "the fleet events queue still exists",
+  "the replacement role's identity policies allow sqs:SendMessage on the fleet events queue",
+  "the replacement role's trust policy allows sts:AssumeRole for ssm, events, scheduler, codebuild, ec2 and s3 (.amazonaws.com)",
+  "the replacement role's identity policies allow states:StartExecution on the inventory state machine",
+  "no IAM role in the account has a trust policy referencing the legacy role's ARN, name or unique id",
+  "no inline policy on the replacement, release-gate, compliance-scan or metrics-agent roles references the legacy role's ARN, name or unique id",
+  "the runner-role SSM parameter exists and its value is the replacement role's ARN",
+  "the reporting-role SSM parameter exists and still holds the metrics role's ARN",
+]
+keywords = ["aws", "iam", "eventbridge", "s3", "ssm", "ec2", "codebuild", "decommissioning", "security"]
+extra_tools = []

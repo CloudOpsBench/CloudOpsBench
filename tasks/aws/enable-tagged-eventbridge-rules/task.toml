@@ -1,0 +1,19 @@
+[task]
+name = "enable-tagged-eventbridge-rules"
+description = "Enable every EventBridge rule tagged App=intake and leave all other rules as they are"
+
+[metadata]
+initial_state_description = "The home region's default bus has two App=intake rules, one enabled and one disabled, and a disabled App=drill rule that must stay disabled. A third App=intake rule is disabled on a custom bus in a second region and its name does not follow the intake pattern. Setup also records the state of every other rule across all regions and buses."
+outcome_description = "All App=intake rules on any bus in any region are enabled and still tagged. The drill rule and every other recorded rule still exist in their original state."
+criteria_descriptions = [
+  "each of the three seeded intake rules still exists on its original bus and region",
+  "each of the three seeded intake rules is ENABLED",
+  "each of the three seeded intake rules still has the App=intake tag",
+  "the App=drill rule still exists and is DISABLED",
+  "every App=intake rule on any bus in any region is ENABLED",
+  "at least three distinct App=intake rules are found across the seeded rules and the sweep",
+  "every non-intake rule recorded at setup still exists",
+  "every non-intake rule recorded at setup keeps its recorded state",
+]
+keywords = ["aws", "eventbridge", "tagging", "multi-region"]
+extra_tools = []

@@ -1,0 +1,37 @@
+[task]
+name = "restore-ecr-image-scan-coverage"
+description = "Restore vulnerability scanning coverage across a container registry"
+
+[metadata]
+
+initial_state_description = """
+An ECR registry in us-east-1 holds four application repositories and one upstream mirror, all
+tagged Project=scanpolicy-demo. Every repository has scanOnPush=true at the repository level, but
+the registry scanning configuration names only the payments repository, so the other four are on
+manual scanning. An EventBridge rule on the default bus forwards ECR image scan events to an SNS
+topic, but its pattern only matches the payments repository. Two repositories tagged
+Project=data-platform belong to another team and are covered by a second filter in the same
+scanning rule. A fifth application repository lives in the account's ECR replication destination
+region, whose registry scanning configuration is empty."""
+
+outcome_description = """
+Every application repository in both registries is scanned automatically on push, and the mirror
+is not. The other team's two repositories are still scanned. A completed image scan in any of the
+four us-east-1 application repositories is forwarded to the security SNS topic by an enabled rule
+on the default bus that the topic policy allows. Both registries stay on basic scanning with
+Inspector and enhanced scanning disabled, and no repository is deleted or replaced. Any filter and
+event pattern shape is acceptable."""
+
+criteria_descriptions = [
+  "all eight seeded repositories still exist with their original ARN, creation time, encryption configuration and tag mutability",
+  "the registry scan type is still BASIC in both regions",
+  "the replication destination region's registry scanning configuration puts the application repository there on automatic scanning",
+  "the us-east-1 registry scanning configuration puts each of the four application repositories on automatic scanning",
+  "no SCAN_ON_PUSH or CONTINUOUS_SCAN filter matches the upstream mirror repository",
+  "the two data-platform repositories are still matched by a SCAN_ON_PUSH or CONTINUOUS_SCAN filter",
+  "the security SNS topic still exists, and its policy allows the routing rule to publish, conditions included",
+  "an enabled EventBridge rule on the default bus targets the security topic and, per TestEventPattern, matches a completed ECR image scan event with and without findings for each of the four application repositories",
+]
+
+keywords = ["aws", "ecr", "eventbridge", "sns", "security", "multi-region"]
+extra_tools = []

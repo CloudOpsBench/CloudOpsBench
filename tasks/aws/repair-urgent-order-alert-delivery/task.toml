@@ -1,0 +1,24 @@
+[task]
+name = "repair-urgent-order-alert-delivery"
+description = "Fix every reason urgent order events published to an SNS topic do not reach the on-call SQS queue"
+
+[metadata]
+initial_state_description = """
+Setup creates a `fulfillment-alerts-topic-` SNS topic and an `oncall-escalation-queue-` SQS queue
+with a subscription between them. The queue policy only allows SNS delivery from a different,
+nonexistent topic ARN, and raw message delivery is off. The filter policy matches priority URGENT
+in uppercase or category ComplianceAudit, but urgent events are published with lowercase priority."""
+outcome_description = """
+An event published with message attribute priority=urgent (lowercase) arrives in the queue as its
+plain JSON body, without the SNS envelope. Events with category ComplianceAudit still arrive, and
+the original topic and queue remain."""
+criteria_descriptions = [
+  "the seeded topic still exists",
+  "the seeded queue still exists",
+  "the grader can publish probe messages to the topic",
+  "a probe with message attribute priority=urgent (lowercase) reaches the queue before the polling deadline",
+  "no message received during polling is wrapped in the SNS notification envelope",
+  "a probe with message attribute category=ComplianceAudit reaches the queue before the polling deadline",
+]
+keywords = ["aws", "sns", "sqs", "messaging", "troubleshooting"]
+extra_tools = []

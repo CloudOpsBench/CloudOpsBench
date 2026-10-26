@@ -1,0 +1,23 @@
+[task]
+name = "lower-order-error-alarm-threshold"
+description = "Lower a CloudWatch order-error alarm's threshold from 1000 to 100 so it pages on-call earlier"
+
+[metadata]
+initial_state_description = """
+A `vera2-high-order-errors-` CloudWatch alarm watches the `vera2/orders` `OrderErrors` metric with GreaterThanOrEqualToThreshold and a threshold of 1000.
+An IAM role and an enabled EventBridge Scheduler schedule call PutMetricAlarm every 30 minutes with the original alarm definition, including the 1000 threshold.
+The schedule starts one day in the future, so it has not run yet."""
+outcome_description = """
+The same alarm watches the same namespace and metric with the same comparison operator and a threshold of 100.
+No schedule overwrites the fix.
+The grader accepts any threshold from 1 to 100 and fails if a readable enabled schedule would reset it above 100."""
+criteria_descriptions = [
+  "the alarm can be read and still exists under its seeded name",
+  "the alarm still watches the seeded namespace and metric",
+  "the alarm's comparison operator is GreaterThanOrEqualToThreshold",
+  "the alarm threshold is between 1 and 100 inclusive (the instruction asks for exactly 100)",
+  "the EventBridge Scheduler schedules can be listed",
+  "no readable enabled schedule has a PutMetricAlarm target whose input names the alarm and sets a threshold above 100 (schedules that fail get_schedule are skipped)",
+]
+keywords = ["aws", "cloudwatch", "eventbridge-scheduler", "iam", "monitoring", "drift"]
+extra_tools = []

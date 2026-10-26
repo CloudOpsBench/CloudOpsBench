@@ -1,0 +1,23 @@
+[task]
+name = "revoke-external-access-trial-integration"
+description = "Find every resource of a retiring trial integration that is reachable from outside the account and restrict it to the account"
+
+[metadata]
+initial_state_description = """
+A vera2- SNS topic in us-east-1 has an access policy that lets any AWS principal subscribe.
+A vera2- application in the AWS Serverless Application Repository has an application
+policy that lets any principal deploy it. Describing the application does not return that
+policy; only a separate policy call does.
+"""
+outcome_description = """
+Only this account can reach the trial integration's resources. The grader only looks for
+unconditioned wildcard Allow statements on the seeded SNS topic and SAR application. It
+does not reject explicit external-account grants or validate conditions, and it skips a
+resource whose identifier is missing or whose policy cannot be read.
+"""
+criteria_descriptions = [
+  "the seeded Serverless Application Repository application's policy has no unconditioned Allow for the wildcard principal (skipped if the identifier is missing or the read fails)",
+  "the seeded SNS topic's policy has no unconditioned Allow for the wildcard principal (skipped if the identifier is missing or the read fails)",
+]
+keywords = ["aws", "sns", "serverlessrepo", "security", "public-access"]
+extra_tools = []

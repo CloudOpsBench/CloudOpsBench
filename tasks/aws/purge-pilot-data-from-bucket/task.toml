@@ -1,0 +1,20 @@
+[task]
+name = "purge-pilot-data-from-bucket"
+description = "Delete the vera2 pilot's data from its S3 bucket and keep the bucket"
+
+[metadata]
+initial_state_description = """
+A vera2- S3 bucket holds two small objects under the records/ prefix.
+It also has an in-progress multipart upload for a third key with one 5 MB part uploaded.
+That part does not show up in an object listing, only in the multipart upload listing."""
+outcome_description = """
+The bucket still exists and holds no objects.
+The seeded multipart upload is aborted or completed, so no parts remain stored.
+Deleting the bucket fails the task."""
+criteria_descriptions = [
+  "the seeded bucket still exists and is reachable",
+  "an object listing of the bucket returns no objects",
+  "the seeded multipart upload ID is no longer in the bucket's in-progress multipart uploads",
+]
+keywords = ["aws", "s3", "decommissioning", "data-cleanup"]
+extra_tools = []

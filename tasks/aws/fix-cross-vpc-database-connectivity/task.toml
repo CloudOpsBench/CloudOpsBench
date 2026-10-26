@@ -1,0 +1,25 @@
+[task]
+name = "fix-cross-vpc-database-connectivity"
+description = "Fix app servers in prod-vpc timing out when connecting to the database in shared-vpc"
+
+[metadata]
+initial_state_description = """
+prod-vpc (10.0.0.0/16) and shared-vpc (172.16.0.0/16) are joined by an active peering connection.
+Each VPC has two subnets on a custom route table, and neither route table has a route to the other VPC.
+shared-rds-sg, tagged as the primary PostgreSQL database, has no inbound rule for port 5432.
+The ten prod-vpc security groups have names that don't match their Role tags, so the app tier is prod-web-sg.
+shared-vpc has four other unrelated security groups."""
+outcome_description = """
+Both custom route tables have an active route to the other VPC's CIDR through the existing peering connection.
+shared-rds-sg allows inbound TCP 5432 from prod-web-sg or from 10.0.0.0/16.
+The peering connection stays active and all four subnets stay on their custom route tables."""
+criteria_descriptions = [
+  "the original VPC peering connection is still active",
+  "prod-custom-rt has an active route to 172.16.0.0/16 through that peering connection",
+  "shared-custom-rt has an active route to 10.0.0.0/16 through that peering connection",
+  "shared-rds-sg has a TCP or all-protocol inbound rule covering port 5432 from prod-web-sg or from exactly 10.0.0.0/16",
+  "prod-subnet-a and prod-subnet-b are still associated with prod-custom-rt",
+  "shared-subnet-a and shared-subnet-b are still associated with shared-custom-rt",
+]
+keywords = ["aws", "vpc", "ec2", "networking", "troubleshooting"]
+extra_tools = []

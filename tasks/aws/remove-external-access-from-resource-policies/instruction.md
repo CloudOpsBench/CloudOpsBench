@@ -1,0 +1,4 @@
+The vera2 project (us-east-1) needs its external access locked down. Several vera2 resources are currently reachable by principals that sit outside our AWS account, through the resource-based policies attached to them -- some are open to everyone, others to one outside account in particular. For every vera2 resource that can hold a resource-based policy, in whatever service it happens to be, strip out any access that has been extended to a principal beyond this account.
+
+A policy statement is an exposure when it Allows, and its principal is either the "*" wildcard that no Condition ties back to this account, or an AWS account that is not ours. Access that stays within this account -- its own id, roles, or users -- is fine and must be left alone. Do not remove, disable, or rebuild any resource; when you are done, nothing may be usable by a principal from outside this account.
+Be thorough and careful, double check all your results.

@@ -1,10 +1,24 @@
 [task]
 name = "tighten-sqs-redrive-allow-policy"
-description = "Tighten a dead-letter queue's redrive-allow policy to least privilege."
+description = "Tighten a dead-letter queue's redrive-allow policy to least privilege"
 
 [metadata]
-initial_state_description = "Terraform manages the orders main queue and its dead-letter queue, whose redrive allow policy initially permits every source queue in the account. A separate retry queue, created outside Terraform, already uses that same dead-letter queue as its redrive target."
-outcome_description = "The dead-letter queue uses a byQueue redrive allow policy that includes both the named main queue and the existing retry queue, with no recognized wildcard grant. Tightening the broad grant must not break the out-of-band retry queue dependency."
-criteria_descriptions = ["The dead-letter queue exists and has a readable RedriveAllowPolicy.", "The redrivePermission value is byQueue rather than allowAll or denyAll.", "The source queue ARN list includes the orders main queue.", "The source queue ARN list includes the out-of-band orders retry queue.", "The source list contains neither a bare wildcard nor an account-wide queue wildcard."]
+initial_state_description = """
+Terraform manages the orders main queue and its dead-letter queue, whose redrive-allow
+policy permits every source queue in the account. A retry queue created outside Terraform
+already uses the same dead-letter queue as its redrive target.
+"""
+outcome_description = """
+The dead-letter queue has a byQueue redrive-allow policy listing both the main queue and
+the retry queue, with no wildcard source. Tightening the policy must not break the retry
+queue.
+"""
+criteria_descriptions = [
+  "the dead-letter queue exists and has a readable RedriveAllowPolicy",
+  "redrivePermission is byQueue",
+  "the source queue ARNs include the orders main queue",
+  "the source queue ARNs include the orders retry queue created outside Terraform",
+  "the source queue ARNs contain neither \"*\" nor an account-wide queue wildcard",
+]
 keywords = ["aws", "terraform", "sqs", "security", "least-privilege"]
 extra_tools = []

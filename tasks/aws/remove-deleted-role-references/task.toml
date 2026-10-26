@@ -1,0 +1,27 @@
+[task]
+name = "remove-deleted-role-references"
+description = "Remove the remaining references to a deleted telemetry role without re-creating it"
+
+[metadata]
+initial_state_description = """
+vera2-fleet-telemetry-role was deleted when an old telemetry pipeline was retired.
+It is gone from aws iam list-roles, and IAM Access Analyzer and the Resource Groups Tagging API return nothing for it.
+Two things still name it. An inline policy on vera2-fleet-ops-role grants access to its ARN, which a normal IAM sweep finds.
+The account's Greengrass service-role association also holds its ARN, and that getter takes no identifier, so no listing or sweep finds it.
+vera2-fleet-deploy-role never referenced the retired role and should stay untouched."""
+outcome_description = """
+No IAM policy document or the service-role association names vera2-fleet-telemetry-role.
+The association is either cleared or points at a role that already existed.
+The retired role stays deleted, no new role is created, and vera2-fleet-deploy-role is unchanged."""
+criteria_descriptions = [
+  "the account's Greengrass service-role association can be read",
+  "the association is re-read every 5 seconds until two reads agree (up to four re-reads) before it is judged",
+  "the association no longer names the retired role",
+  "if the association is set, the role it names exists",
+  "if the association is set, the role it names was created no later than 5 seconds after setup finished",
+  "vera2-fleet-telemetry-role still does not exist in IAM",
+  "vera2-fleet-deploy-role still exists with the same trust policy, inline policies, attached policies, description, max session duration, permissions boundary and tags",
+  "no role trust policy or inline policy, user or group inline policy, or default version of a customer managed policy names the retired role (service-linked roles are skipped)",
+]
+keywords = ["iam", "greengrass", "decommissioning", "account-settings", "dangling-reference"]
+extra_tools = []

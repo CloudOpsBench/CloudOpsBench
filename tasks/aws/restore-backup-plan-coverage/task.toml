@@ -1,0 +1,34 @@
+[task]
+name = "restore-backup-plan-coverage"
+description = "Restore AWS Backup plan coverage for a tagged fleet with no recovery points, without backing up its scratch bucket"
+
+[metadata]
+initial_state_description = """
+An AWS Backup plan in us-east-1 selects resources tagged backup=nightly into a vault. Its role has
+the AWS managed backup policies plus an inline deny on all elasticfilesystem actions. The fleet is
+two DynamoDB tables, two encrypted EFS file systems and a scratch S3 bucket. One table lacks the
+backup tag. The region's opt-in is disabled for EFS and S3, and the S3 opt-in is the only thing
+keeping the tagged scratch bucket out. One file system has a policy that denies
+elasticfilesystem:Backup, which only shows up once the opt-in and role are fixed."""
+outcome_description = """
+Both tables and both file systems are matched by a selection on the plan, and backup jobs the
+grader starts for them into the vault with the matching selection's role complete. The scratch
+bucket is still not backed up by the plan. The plan, vault and fleet resources are the seeded ones,
+not deleted or recreated."""
+criteria_descriptions = [
+  "the seeded backup plan can be read",
+  "the seeded backup vault can be read",
+  "the plan has at least one backup selection",
+  "for each table and file system matched by a selection, AWS Backup accepts a backup job into the vault using the role of at least one matching selection",
+  "each started backup job reaches COMPLETED within 420 seconds",
+  "both tables and both file systems are each matched by at least one selection on the plan",
+  "if a selection matches the scratch bucket, a backup job using the first matching selection's role is refused",
+  "the vault holds no recovery points for the scratch bucket",
+  "at least one rule on the plan still targets the seeded vault",
+  "both tables, both file systems, the scratch bucket and the vault still exist",
+  "each table has its seeded table ID",
+  "the scratch bucket has its seeded creation date",
+  "the vault has its seeded creation date",
+]
+keywords = ["aws", "backup", "dynamodb", "efs", "s3", "iam", "data-protection"]
+extra_tools = []

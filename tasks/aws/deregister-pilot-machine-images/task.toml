@@ -1,0 +1,13 @@
+[task]
+name = "deregister-pilot-machine-images"
+description = "Deregister the retired vera2 pilot's machine images, leave other teams' images alone, and report which were deregistered"
+
+[metadata]
+initial_state_description = "One vera2- AMI tagged Project=vera2 is registered from a small EBS snapshot. A Recycle Bin rule keeps deregistered EC2 images tagged Project=vera2 for seven days. Setup confirms the rule is enforcing and leaves the bin empty. A plain deregistration moves the image into the Recycle Bin, where it is restorable and hidden from describe-images."
+outcome_description = "The pilot's image is not registered and not in the Recycle Bin. Deregistering while the retention rule still covers the image is not enough. Only the image's state is graded, not the report or other images."
+criteria_descriptions = [
+  "describe-images does not return the pilot's image, or returns it only as deregistered",
+  "the pilot's image is not in the account's Recycle Bin",
+]
+keywords = ["aws", "ec2", "ami", "recycle-bin", "decommissioning"]
+extra_tools = []

@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Check that the `live` alias runs new code and the SQS event-source mapping follows it.
-
-Passes when the alias resolves to a code hash different from /vera/<func>/old-sha in
-SSM, and the function's event-source mapping is active and resolves to the same code
-hash as the alias.
-"""
 import json, os, subprocess, sys
 
 REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")

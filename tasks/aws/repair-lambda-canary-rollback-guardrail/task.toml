@@ -1,0 +1,50 @@
+[task]
+name = "repair-lambda-canary-rollback-guardrail"
+description = "Repair a Lambda canary deployment guardrail in place: the live alias, CodeDeploy deployment group, error alarm and CodeDeploy role"
+
+[metadata]
+initial_state_description = """
+A Lambda function has stable and candidate published versions. Its live alias points at the
+candidate with 50 percent weight on the stable version. A CodeDeploy Lambda application and
+deployment group use the all-at-once configuration with alarm monitoring and automatic rollback
+disabled. The Errors alarm is scoped to the whole function, uses a five-minute period with a
+threshold of more than two errors, and treats missing data as breaching. The CodeDeploy role has
+the AWS managed AWSCodeDeployRoleForLambda policy, and neither the function nor the role has the
+SecurityProfile tag."""
+outcome_description = """
+The live alias targets only the stable version. The existing deployment group uses the
+10-percent/five-minute canary, rolls back on failure and alarm breach, and watches only the seeded
+alarm. That alarm is scoped to the live alias with a one-minute period, fires on one error and
+treats missing data as not breaching. The CodeDeploy role can only manage the live alias and read
+alarms, and the function and role carry the SecurityProfile tag. The function, its code and
+configuration, both versions, the alias, the CodeDeploy application and group, both roles and the
+ownership tags are the original seeded resources."""
+criteria_descriptions = [
+  "the task context file is present and readable",
+  "the function's runtime, handler, timeout, memory size, description and environment variables match the seeded configuration",
+  "the function ARN and code hash are unchanged",
+  "the live alias keeps its seeded ARN, targets the stable version and has no additional version weights",
+  "the seeded stable and candidate versions both still exist",
+  "the deployment group and CodeDeploy application keep their seeded IDs, and the group uses the seeded CodeDeploy role",
+  "the deployment group uses CodeDeployDefault.LambdaCanary10Percent5Minutes",
+  "the deployment group uses BLUE_GREEN with WITH_TRAFFIC_CONTROL",
+  "automatic rollback is enabled for both DEPLOYMENT_FAILURE and DEPLOYMENT_STOP_ON_ALARM",
+  "alarm monitoring is enabled, does not ignore alarm polling failures and lists only the seeded alarm",
+  "the seeded alarm exists and measures AWS/Lambda Errors with the Sum statistic",
+  "the alarm uses a 60-second period and one evaluation period",
+  "the alarm fires on one error, as greater than or equal to 1 or greater than 0",
+  "the alarm treats missing data as not breaching",
+  "the alarm dimensions are exactly FunctionName for the function and Resource for the live alias",
+  "the CodeDeploy role keeps its seeded role ID, and its trust policy has one Allow statement for codedeploy.amazonaws.com with sts:AssumeRole",
+  "the CodeDeploy role has at least one inline or attached policy",
+  "the role's policies have unconditional Allows for lambda:UpdateAlias and lambda:GetAlias that list the live alias ARN as a resource",
+  "the role's policies have an unconditional Allow for cloudwatch:DescribeAlarms on resource *",
+  "no Allow covering lambda:UpdateAlias or lambda:GetAlias names a resource other than the live alias ARN",
+  "no unconditional Deny covers the required alias or alarm-read actions",
+  "every action in the role's Allow statements is one of cloudwatch:DescribeAlarms, lambda:UpdateAlias, lambda:GetAlias, lambda:GetProvisionedConcurrencyConfig, lambda:InvokeFunction, sns:Publish, s3:GetObject or s3:GetObjectVersion, with no wildcards",
+  "the Lambda execution role keeps its seeded role ID",
+  "the function and the CodeDeploy role carry the seeded CloudOpTask and Owner tags plus SecurityProfile=secure-canary-rollback-v1",
+  "the Lambda execution role still carries the seeded CloudOpTask and Owner tags",
+]
+keywords = ["aws", "lambda", "codedeploy", "cloudwatch", "iam", "deployment", "least-privilege"]
+extra_tools = []

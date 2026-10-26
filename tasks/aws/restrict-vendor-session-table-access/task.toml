@@ -1,0 +1,51 @@
+[task]
+name = "restrict-vendor-session-table-access"
+description = "Cut an external vendor's sessions off from a reclassified DynamoDB table across all of its integrations"
+
+[metadata]
+
+initial_state_description = """
+Two DynamoDB tables in us-east-1 hold data shared with an external analytics vendor. The
+vendor's three integrations have no standing table permissions. Each assumes one shared
+IAM role and passes a scoping document, and that document is the only thing narrowing the
+session below the role's full grant. Each integration stores its own inline copy of the
+document in its configuration, and every copy still grants both tables. The IAM policy the
+text was copied from has been rewritten to exclude the pricing table and is tagged
+remediated, but it is attached to nothing.
+
+Two integrations run in the home region: a Glue job and a CodeBuild project. The third is
+an ECS worker service in a different region. Nothing in the home region names it or its
+region. It runs as a generic platform worker role that reaches the shared role through a
+managed policy, so searching the home region for the shared role's ARN finds only the
+other two. The worker uses an external deployment controller, so its task sets decide what
+runs, task definitions are immutable, and making a new task set primary does not retire
+the old one. An internal reconciliation role assumes the shared role with no scoping
+document and needs both tables.
+"""
+
+outcome_description = """
+Each integration still assumes the shared role, and the document it passes denies GetItem,
+BatchGetItem, Query and Scan on the pricing table while catalog reads keep working. All
+three integrations still exist and can still obtain credentials, and their code is
+unchanged. The shared role keeps its permissions and trust policy, the reconciliation role
+can still assume it, and both tables keep their configuration and data with no resource
+policy added.
+"""
+
+criteria_descriptions = [
+  "the Glue job meridian-catalog-export, the CodeBuild project meridian-feed-refresh and the ECS service meridian-mirror-svc in the second region are all graded",
+  "each integration still targets the shared role dataex-access-role",
+  "for each integration, the stored scoping document (or the role's full grant if the document was removed) is denied GetItem, BatchGetItem, Query and Scan on the pricing table by the IAM policy simulator",
+  "for each integration, GetItem, BatchGetItem, Query, Scan and DescribeTable on the catalog table are still allowed through its document and the shared role",
+  "every ECS task set with a nonzero scale is graded, so a stale task set must be deleted or scaled to zero",
+  "every task definition a live task set runs is still ACTIVE",
+  "each integration still exists, and its runner role can still assume the shared role and has no direct read grant on the pricing table",
+  "the Glue script location and S3 object, the CodeBuild buildspec, and the ECS container image and command are unchanged",
+  "the shared role's own policies still allow all four read actions and DescribeTable on both tables",
+  "the shared role's trust policy still lets the account root assume it with the seeded condition and no explicit deny",
+  "the reconciliation role still exists and can assume the shared role",
+  "both tables still exist with unchanged configuration and seeded items, and neither has a resource policy",
+]
+
+keywords = ["aws", "dynamodb", "iam", "sts", "ecs", "security", "multi-region"]
+extra_tools = []
