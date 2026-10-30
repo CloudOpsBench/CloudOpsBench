@@ -3,6 +3,7 @@ name = "decommission-analytics-environment"
 description = "Tear down a finished analytics environment by removing every resource named with its prefix"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 Setup creates an Athena workgroup, a Secrets Manager secret, an SSM SecureString parameter and an SQS
 queue in the home region, all named with the `aaq-7c21` prefix. A second Athena workgroup and SSM

@@ -3,6 +3,7 @@ name = "repair-evidence-event-routing"
 description = "Repair a compliance evidence pipeline where none of the sources reach the archiver queue"
 
 [metadata]
+category = "Repair & Recovery"
 
 initial_state_description = """
 A compliance evidence pipeline has never delivered a record and has logged no error, dead-letter or

@@ -3,6 +3,7 @@ name = "fix-cross-vpc-database-connectivity"
 description = "Fix app servers in prod-vpc timing out when connecting to the database in shared-vpc"
 
 [metadata]
+category = "Repair & Recovery"
 initial_state_description = """
 prod-vpc (10.0.0.0/16) and shared-vpc (172.16.0.0/16) are joined by an active peering connection.
 Each VPC has two subnets on a custom route table, and neither route table has a route to the other VPC.

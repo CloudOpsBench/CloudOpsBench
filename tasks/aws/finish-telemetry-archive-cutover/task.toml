@@ -3,6 +3,7 @@ name = "finish-telemetry-archive-cutover"
 description = "Finish a partial archive cutover so nothing writes to the retired bucket"
 
 [metadata]
+category = "Migration & Deployment"
 
 initial_state_description = """
 The retired telemetry archive bucket and its replacement both exist in us-east-1. The

@@ -3,6 +3,7 @@ name = "enable-efs-automatic-backups"
 description = "Enable automatic backups on the vera2 EFS file systems"
 
 [metadata]
+category = "Configuration & Monitoring"
 initial_state_description = "Three EFS file systems tagged Project=vera2 and named vera2-fs-* are created with backup policy DISABLED. Two are in the default region (us-east-1 unless overridden) and one is in us-west-2, which the instruction does not mention."
 outcome_description = "Every seeded vera2 file system in both regions still exists and has backup policy status ENABLED or ENABLING."
 criteria_descriptions = [

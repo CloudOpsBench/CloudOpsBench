@@ -3,6 +3,7 @@ name = "revoke-external-access-subsidiary-workspace"
 description = "Close every remaining outside-the-account share left behind by a subsidiary workspace"
 
 [metadata]
+category = "Security & Access"
 
 initial_state_description = """
 Two leftovers of the vera3 subsidiary workspace in us-east-1 are shared outside the

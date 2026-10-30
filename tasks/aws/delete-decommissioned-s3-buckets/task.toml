@@ -3,6 +3,7 @@ name = "delete-decommissioned-s3-buckets"
 description = "Delete every vera2 S3 bucket in us-east-1 as part of decommissioning the project"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 A general-purpose S3 bucket with a vera2-data- prefix and an S3 table bucket with a vera2-warehouse-
 prefix are created in us-east-1. Table buckets belong to the separate s3tables service and are not

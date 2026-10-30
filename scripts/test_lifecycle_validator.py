@@ -10,7 +10,7 @@ import validate
 
 
 class LifecycleValidationTests(unittest.TestCase):
-    def validate_task(self, *, missing_check=False, wrapper=False, metadata=""):
+    def validate_task(self, *, missing_check=False, wrapper=False, metadata='[metadata]\ncategory = "Decommissioning"\n'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             task = root / "tasks/aws/demo"
@@ -41,7 +41,13 @@ class LifecycleValidationTests(unittest.TestCase):
         self.assertEqual(self.validate_task(wrapper=True), 1)
 
     def test_explicit_wrong_id_rejected(self):
-        self.assertEqual(self.validate_task(metadata='[metadata]\nid = "wrong"\n'), 1)
+        self.assertEqual(self.validate_task(metadata='[metadata]\ncategory = "Decommissioning"\nid = "wrong"\n'), 1)
+
+    def test_missing_category_rejected(self):
+        self.assertEqual(self.validate_task(metadata=""), 1)
+
+    def test_unknown_category_rejected(self):
+        self.assertEqual(self.validate_task(metadata='[metadata]\ncategory = "Pipelines"\n'), 1)
 
 
 if __name__ == "__main__":

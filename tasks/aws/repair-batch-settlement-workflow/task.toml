@@ -3,6 +3,7 @@ name = "repair-batch-settlement-workflow"
 description = "Repair the batch-settlement Step Functions workflow and route the live and audit aliases to two different repaired versions"
 
 [metadata]
+category = "Repair & Recovery"
 initial_state_description = """
 batch-settlement is a STANDARD Step Functions state machine with an IAM execution role, written in JSONata as two Pass states.
 The first assigns a computed result and the second emits batchId, invoices, and summary.

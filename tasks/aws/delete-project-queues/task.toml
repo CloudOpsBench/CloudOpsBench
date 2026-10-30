@@ -3,6 +3,7 @@ name = "delete-project-queues"
 description = "Delete every queue of the retired vera2 project so no vera2- queue remains in the account"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = "Setup creates two SQS queues and one AWS Elemental MediaConvert queue, all named with the vera2- prefix. The MediaConvert queue appears only in the MediaConvert API, not in SQS listings."
 outcome_description = "No vera2- queue remains in the region in either SQS or MediaConvert. Deleting only the SQS queues leaves the MediaConvert queue behind and fails."
 criteria_descriptions = [

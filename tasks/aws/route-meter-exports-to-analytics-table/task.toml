@@ -3,6 +3,7 @@ name        = "route-meter-exports-to-analytics-table"
 description = "Route every meter interval exporter into the dataset the analytics table reads"
 
 [metadata]
+category = "Migration & Deployment"
 
 initial_state_description = """
 A utility metering platform exports interval readings through Amazon Data Firehose. Four

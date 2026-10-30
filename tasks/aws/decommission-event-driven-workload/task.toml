@@ -3,6 +3,7 @@ name = "decommission-event-driven-workload"
 description = "Fully dismantle the retired aeb-<region> event-driven workload so that no resource with that prefix remains anywhere"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 Setup creates a disabled scheduled EventBridge rule, an SQS queue and an SNS topic in the home region,
 all named with the aeb-<region> prefix. It also creates a second disabled rule and SQS queue with the

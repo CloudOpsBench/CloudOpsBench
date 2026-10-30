@@ -3,6 +3,7 @@ name = "restore-audit-log-relay-coverage"
 description = "Restore full audit relay coverage across a fleet of application log groups"
 
 [metadata]
+category = "Repair & Recovery"
 
 initial_state_description = """
 CloudWatch Logs relays application logs into Kinesis streams named audit-relay-stream-* through a

@@ -3,6 +3,7 @@ name = "delete-pilot-images"
 description = "Delete the vera2 pilot's images so no vera2- image remains in the account"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = "Setup creates a 1 GiB EBS volume, a snapshot of it, and a vera2- AMI registered from the snapshot. It also creates an IAM role and a vera2- SageMaker image, which lives in the SageMaker API and does not appear in EC2 image listings."
 outcome_description = "No self-owned vera2- AMI is registered and no vera2- SageMaker image exists in the region. SageMaker image deletion is asynchronous, so the image must be gone, not still deleting, by the end of the grader's wait."
 criteria_descriptions = [

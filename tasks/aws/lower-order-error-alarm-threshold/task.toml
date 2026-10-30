@@ -3,6 +3,7 @@ name = "lower-order-error-alarm-threshold"
 description = "Lower a CloudWatch order-error alarm's threshold from 1000 to 100 so it pages on-call earlier"
 
 [metadata]
+category = "Configuration & Monitoring"
 initial_state_description = """
 A `vera2-high-order-errors-` CloudWatch alarm watches the `vera2/orders` `OrderErrors` metric with GreaterThanOrEqualToThreshold and a threshold of 1000.
 An IAM role and an enabled EventBridge Scheduler schedule call PutMetricAlarm every 30 minutes with the original alarm definition, including the 1000 threshold.

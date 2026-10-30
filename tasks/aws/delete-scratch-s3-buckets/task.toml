@@ -3,6 +3,7 @@ name = "delete-scratch-s3-buckets"
 description = "Empty and delete every vera2 S3 bucket in us-east-1 while shutting down the project"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = "Setup creates two general-purpose buckets (vera2-logs-, vera2-assets-) in us-east-1 and one S3 Express One Zone directory bucket (vera2-cache-) in use1-az4. Directory buckets are not returned by list-buckets, only by list-directory-buckets."
 outcome_description = "None of the three seeded buckets remains in either the general-purpose or the directory bucket listing."
 criteria_descriptions = [

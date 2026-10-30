@@ -3,6 +3,7 @@ name = "delete-pilot-ebs-volumes"
 description = "Delete the retired vera2 pilot's EBS volumes and leave other teams' volumes alone"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 One available gp3 volume named with a vera2- prefix and tagged Project=vera2 exists in us-east-1. A
 Recycle Bin retention rule holds deleted EBS volumes tagged Project=vera2 for seven days. Setup

@@ -3,6 +3,7 @@ name = "remove-external-access-from-resource-policies"
 description = "Remove access for principals outside the account from the resource-based policies of every vera2 resource in us-east-1"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 A vera2 SNS topic and a vera2 SQS queue each have a policy that allows the wildcard principal with no condition.
 A vera2 Kinesis stream has a resource policy granting GetRecords to an external account, visible only through get-resource-policy.

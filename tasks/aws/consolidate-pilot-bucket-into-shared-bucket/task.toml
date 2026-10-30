@@ -3,6 +3,7 @@ name = "consolidate-pilot-bucket-into-shared-bucket"
 description = "Move a pilot dataset from its S3 bucket into the team's shared bucket under the same keys and leave the source bucket empty"
 
 [metadata]
+category = "Migration & Deployment"
 initial_state_description = """
 Setup creates a `vera2-` source bucket ending in `-pilot` and a destination bucket ending in
 `-shared` in us-east-1. The source holds two objects under `data/` and the shared bucket holds one

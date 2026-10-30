@@ -3,6 +3,7 @@ name = "repair-lambda-canary-rollback-guardrail"
 description = "Repair a Lambda canary deployment guardrail in place: the live alias, CodeDeploy deployment group, error alarm and CodeDeploy role"
 
 [metadata]
+category = "Migration & Deployment"
 initial_state_description = """
 A Lambda function has stable and candidate published versions. Its live alias points at the
 candidate with 50 percent weight on the stable version. A CodeDeploy Lambda application and

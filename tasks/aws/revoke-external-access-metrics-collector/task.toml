@@ -3,6 +3,7 @@ name = "revoke-external-access-metrics-collector"
 description = "Find every vera2 resource reachable from outside the account and restrict it to the account"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 A vera2- SNS topic in us-east-1 has a topic policy that lets any AWS principal subscribe. A
 vera2- Serverless Application Repository application has an application policy that grants

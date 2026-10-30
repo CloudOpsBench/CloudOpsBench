@@ -3,6 +3,7 @@ name = "promote-lambda-live-alias"
 description = "Publish a new Lambda build and cut the live alias over to it"
 
 [metadata]
+category = "Migration & Deployment"
 initial_state_description = """
 Terraform manages an order processor Lambda function and its live alias, which points at the old published build.
 The workspace has new handler code ready to deploy.

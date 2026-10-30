@@ -3,6 +3,7 @@ name = "tighten-kinesis-resource-policy"
 description = "Tighten a Kinesis data stream's resource policy to least privilege"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 Terraform manages a Kinesis stream with an account-root resource policy granting broad
 access, plus producer, analytics consumer and outsider IAM roles that have no Kinesis

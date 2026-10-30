@@ -3,6 +3,7 @@ name = "purge-pilot-data-from-bucket"
 description = "Delete the vera2 pilot's data from its S3 bucket and keep the bucket"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 A vera2- S3 bucket holds two small objects under the records/ prefix.
 It also has an in-progress multipart upload for a third key with one 5 MB part uploaded.

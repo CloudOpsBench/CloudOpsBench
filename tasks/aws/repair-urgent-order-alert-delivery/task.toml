@@ -3,6 +3,7 @@ name = "repair-urgent-order-alert-delivery"
 description = "Fix every reason urgent order events published to an SNS topic do not reach the on-call SQS queue"
 
 [metadata]
+category = "Repair & Recovery"
 initial_state_description = """
 Setup creates a `fulfillment-alerts-topic-` SNS topic and an `oncall-escalation-queue-` SQS queue
 with a subscription between them. The queue policy only allows SNS delivery from a different,

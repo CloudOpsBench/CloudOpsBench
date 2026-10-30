@@ -3,6 +3,7 @@ name = "restore-dynamodb-write-autoscaling"
 description = "Fix a provisioned DynamoDB table whose write capacity is stuck at 2 so it auto-scales between 2 and 10"
 
 [metadata]
+category = "Configuration & Monitoring"
 initial_state_description = """
 A provisioned vera2-orders- table has its write capacity registered as an Application Auto Scaling
 target with minimum and maximum both 2, plus a target-tracking policy on write utilization. A

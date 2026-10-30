@@ -3,6 +3,7 @@ name = "decommission-customer-portal"
 description = "Remove everything belonging to the retired customer portal from the account while keeping the billing workload intact"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 The customer portal owns an SQS queue, an SNS topic and a CloudWatch Logs log group, named with a
 vera2 portal prefix and a per-run suffix. The billing workload owns a matching queue, topic and log

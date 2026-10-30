@@ -3,6 +3,7 @@ name = "restore-ecr-image-scan-coverage"
 description = "Restore vulnerability scanning coverage across a container registry"
 
 [metadata]
+category = "Security & Access"
 
 initial_state_description = """
 An ECR registry in us-east-1 holds four application repositories and one upstream mirror, all

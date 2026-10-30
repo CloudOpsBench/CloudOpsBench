@@ -3,6 +3,7 @@ name = "consolidate-directory-bucket-into-shared-bucket"
 description = "Consolidate the dataset in a vera2 S3 Express One Zone directory bucket into the shared general-purpose bucket under the same keys and leave the directory bucket empty"
 
 [metadata]
+category = "Migration & Deployment"
 initial_state_description = """
 A vera2 pilot directory bucket in use1-az4 holds two objects, data/rows.csv and data/manifest.json,
 and an in-progress multipart upload for data/pilot-2026Q1.parquet with one uploaded 5 MiB part. The

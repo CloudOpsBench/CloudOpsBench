@@ -29,8 +29,22 @@ explicit, versioned changes shared by all backends, not private compatibility pa
 - `[task].name` identifies the source task. The runner prefixes an unqualified name with
   `cloudopsbench/` in the rendered copy to satisfy Harbor's `org/name` requirement.
 - Use `[metadata]` for descriptions and curation information.
+- Set `metadata.category` to one of the five categories below. `scripts/validate.py` rejects
+  a missing or unknown value.
 - Configure task-appropriate `[agent].timeout_sec`, `[verifier].timeout_sec`, and
   `[environment].build_timeout_sec`. Calibrate budgets before publishing results.
+
+### Categories
+
+Assign the first category whose test the task meets:
+
+| Category | Test |
+|---|---|
+| `Security & Access` | Is the end state about identities, permissions, secrets, or scan coverage? |
+| `Decommissioning` | Must the target or its data be gone? |
+| `Migration & Deployment` | Is something moving to a new target or version? |
+| `Configuration & Monitoring` | Does the ticket state the setting or value to reach on a live service? |
+| `Repair & Recovery` | Otherwise: is something broken, with the cause left to find? |
 
 ## Source vs. rendered package
 

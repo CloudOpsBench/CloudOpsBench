@@ -3,6 +3,7 @@ name = "reconnect-tagged-alarms-to-sns-topic"
 description = "Wire tagged CloudWatch alarms back to their SNS notification topic"
 
 [metadata]
+category = "Configuration & Monitoring"
 initial_state_description = """
 Two regions each have an SNS topic tagged App=nightbell.
 Three CloudWatch alarms are tagged App=nightbell: two metric alarms in the home region and one composite alarm in the other region.

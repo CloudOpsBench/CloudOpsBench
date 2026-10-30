@@ -3,6 +3,7 @@ name = "repoint-checkout-database-endpoint"
 description = "Update Parameter Store so the vera2 checkout service uses the new database endpoint"
 
 [metadata]
+category = "Migration & Deployment"
 initial_state_description = """
 A String parameter under /vera2/ ending in checkout/db-endpoint holds the legacy database hostname
 as version 1. That version has the label release-current, which the checkout service resolves.

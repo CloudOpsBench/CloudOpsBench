@@ -3,6 +3,7 @@ name = "remove-deleted-role-references"
 description = "Remove the remaining references to a deleted telemetry role without re-creating it"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 vera2-fleet-telemetry-role was deleted when an old telemetry pipeline was retired.
 It is gone from aws iam list-roles, and IAM Access Analyzer and the Resource Groups Tagging API return nothing for it.

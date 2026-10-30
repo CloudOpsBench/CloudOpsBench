@@ -3,6 +3,7 @@ name        = "rotate-exposed-webhook-signing-key"
 description = "Replace an exposed vendor webhook signing key and stop the old value resolving anywhere"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 A webhook relay platform keeps its vendor signing key in a Secrets Manager secret in
 us-east-1, and ECS task definition families named relay-webhook-* read the key from

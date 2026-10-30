@@ -3,6 +3,7 @@ name = "restore-encrypted-bucket-read-access"
 description = "Find why an application role gets AccessDenied reading the reports data bucket and restore its read access within the security team's constraints"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 A ciph-data- bucket uses SSE-KMS default encryption with a customer managed key, and a
 ciph-archive- bucket uses SSE-S3. Each holds reports/q1.txt. The ciph-app- role has an inline

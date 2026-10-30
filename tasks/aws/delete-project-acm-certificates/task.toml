@@ -3,6 +3,7 @@ name = "delete-project-acm-certificates"
 description = "Delete every vera2 ACM certificate in us-east-1 while decommissioning the project"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = "Three self-signed certificates with vera2- domain names are imported into ACM in us-east-1, none attached to anything. Two use RSA-2048 keys and show up in a default listing. The third, vera2-admin.internal.example, uses RSA-4096, which a default ACM listing omits unless the key-type filter is widened."
 outcome_description = "None of the three seeded vera2 certificates exists in ACM, including the RSA-4096 one."
 criteria_descriptions = [

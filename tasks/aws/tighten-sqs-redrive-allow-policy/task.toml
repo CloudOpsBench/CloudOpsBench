@@ -3,6 +3,7 @@ name = "tighten-sqs-redrive-allow-policy"
 description = "Tighten a dead-letter queue's redrive-allow policy to least privilege"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 Terraform manages the orders main queue and its dead-letter queue, whose redrive-allow
 policy permits every source queue in the account. A retry queue created outside Terraform

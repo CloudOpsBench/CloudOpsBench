@@ -3,6 +3,7 @@ name        = "clean-up-pricing-experiment"
 description = "Remove a finished pricing experiment, including the query results it left in a shared bucket"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 A finished Q1 price elasticity test still has resources in the account. Its Athena workgroup writes
 query results to a prefix in a shared, versioned analytics results bucket, so those result sets are a

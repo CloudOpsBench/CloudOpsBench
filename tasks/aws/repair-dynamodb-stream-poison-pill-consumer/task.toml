@@ -3,6 +3,7 @@ name = "repair-dynamodb-stream-poison-pill-consumer"
 description = "Repair a DynamoDB Streams consumer so projection state and receipts are written atomically and transaction envelopes commit all-or-none"
 
 [metadata]
+category = "Repair & Recovery"
 initial_state_description = """
 A tagged Python Lambda consumes a NEW_AND_OLD_IMAGES DynamoDB stream and maintains a projection table and a table of immutable mutation receipts.
 The handler treats event_id as the idempotency key, leaves started markers behind, ignores receipts and transaction envelopes, and the event-source mapping has unsafe failure settings.

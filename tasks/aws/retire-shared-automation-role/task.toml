@@ -3,6 +3,7 @@ name = "retire-shared-automation-role"
 description = "Move everything that uses a legacy shared automation role onto its replacement, remove every reference to the legacy role, and delete it"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 A legacy fleet-maintenance role is used by a nightly EventBridge Scheduler schedule, a
 CodeBuild project, a custom-bus rule target that starts a Step Functions state machine, an

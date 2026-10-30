@@ -3,6 +3,7 @@ name = "restore-backup-plan-coverage"
 description = "Restore AWS Backup plan coverage for a tagged fleet with no recovery points, without backing up its scratch bucket"
 
 [metadata]
+category = "Repair & Recovery"
 initial_state_description = """
 An AWS Backup plan in us-east-1 selects resources tagged backup=nightly into a vault. Its role has
 the AWS managed backup policies plus an inline deny on all elasticfilesystem actions. The fleet is

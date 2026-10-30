@@ -3,6 +3,7 @@ name = "decommission-data-pipeline"
 description = "Fully decommission the deprecated adt- data pipeline by removing every resource that carries its name prefix"
 
 [metadata]
+category = "Decommissioning"
 initial_state_description = """
 A small pipeline is built with a per-run adt- name prefix and no tags, so a tag inventory cannot
 find it. The home region holds a DynamoDB table, a Kinesis stream, an empty ECR repository and an SQS

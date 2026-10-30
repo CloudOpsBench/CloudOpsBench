@@ -3,6 +3,7 @@ name = "revoke-external-access-trial-integration"
 description = "Find every resource of a retiring trial integration that is reachable from outside the account and restrict it to the account"
 
 [metadata]
+category = "Security & Access"
 initial_state_description = """
 A vera2- SNS topic in us-east-1 has an access policy that lets any AWS principal subscribe.
 A vera2- application in the AWS Serverless Application Repository has an application

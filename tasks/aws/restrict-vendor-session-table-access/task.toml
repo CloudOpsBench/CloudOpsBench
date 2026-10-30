@@ -3,6 +3,7 @@ name = "restrict-vendor-session-table-access"
 description = "Cut an external vendor's sessions off from a reclassified DynamoDB table across all of its integrations"
 
 [metadata]
+category = "Security & Access"
 
 initial_state_description = """
 Two DynamoDB tables in us-east-1 hold data shared with an external analytics vendor. The

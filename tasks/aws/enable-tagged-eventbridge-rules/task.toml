@@ -3,6 +3,7 @@ name = "enable-tagged-eventbridge-rules"
 description = "Enable every EventBridge rule tagged App=intake and leave all other rules as they are"
 
 [metadata]
+category = "Configuration & Monitoring"
 initial_state_description = "The home region's default bus has two App=intake rules, one enabled and one disabled, and a disabled App=drill rule that must stay disabled. A third App=intake rule is disabled on a custom bus in a second region and its name does not follow the intake pattern. Setup also records the state of every other rule across all regions and buses."
 outcome_description = "All App=intake rules on any bus in any region are enabled and still tagged. The drill rule and every other recorded rule still exist in their original state."
 criteria_descriptions = [

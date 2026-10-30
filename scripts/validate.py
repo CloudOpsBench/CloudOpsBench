@@ -9,6 +9,13 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = ("instruction.md", "task.toml", "solution/solve.sh")
+CATEGORIES = (
+    "Decommissioning",
+    "Security & Access",
+    "Migration & Deployment",
+    "Configuration & Monitoring",
+    "Repair & Recovery",
+)
 
 
 def required_files(task):
@@ -40,6 +47,8 @@ def main():
             if task_id in ids:
                 errors.append(f"Duplicate task ID: {task_id}")
             ids.add(task_id)
+            if data.get("metadata", {}).get("category") not in CATEGORIES:
+                errors.append(f"{config.relative_to(ROOT)}: metadata.category must be one of {CATEGORIES}")
         except (ValueError, TypeError) as error:
             errors.append(f"{config.relative_to(ROOT)}: {error}")
 
