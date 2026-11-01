@@ -25,26 +25,15 @@ python3 scripts/validate.py
 
 This checks task structure; it does not run agents or create cloud resources.
 
-### Run a task
+### Choose an environment
 
-Execution currently requires access to the private
-[CloudOpsBenchRunner](https://github.com/CloudOpsBench/CloudOpsBenchRunner) and its AWS
-emulator. Follow the runner's setup instructions first; this repository alone does not
-include an execution backend or a public push-button setup.
+Tasks are designed to run against an AWS emulator such as **Vera** or a **real AWS account**,
+using the same setup scripts and checks. This repository provides the tasks; you supply
+an execution harness to run setup, the agent, and grading in your chosen environment.
+See the [lifecycle contract](docs/seeded-tasks.md) for integration details.
 
-From a configured runner checkout, pin a published task commit and run a reference-solution
-trial:
-
-```bash
-export TASKS_REF=REPLACE_WITH_PUBLISHED_COMMIT
-export TASK_ID=aws/disable-alarm-actions-for-maintenance
-uv run cobr list-tasks --tasks-ref "$TASKS_REF"
-uv run cobr run --tasks-ref "$TASKS_REF" --task "$TASK_ID" --harness oracle --seed 1 -k 1 -n 1 --no-upload
-```
-
-Confirm that the task exists at your pinned commit. The `oracle` harness runs the reference
-solution, not a model evaluation. See the runner documentation for agent configuration and
-the [validation procedure](docs/smoke-test.md) for negative controls and reward checks.
+For real AWS, use an isolated test account with scoped credentials and clean up resources
+after each run. Tasks can modify or delete resources and incur AWS charges.
 Never supply real AWS credentials to emulator containers.
 
 ## Tasks
@@ -119,12 +108,10 @@ Canonical task → runner rendering → setup → agent → unchanged grader →
 - **0:** the grader explicitly fails.
 - **No valid reward:** setup or verifier execution error.
 
-The private [CloudOpsBenchRunner](https://github.com/CloudOpsBench/CloudOpsBenchRunner)
-currently executes tasks through Harbor 0.21.0 against a private AWS emulator. It supplies
-dummy credentials and an isolated emulator per trial. An AWS harness can consume the
-same task logic with scoped AWS credentials and cleanup; real-AWS orchestration is not
-implemented in this runner. Cloning this repository alone does not provide an execution
-backend. Never supply real credentials to emulator task containers.
+The execution harness must give setup, the agent, and the grader access to the same
+isolated environment. Use dummy credentials for Vera and scoped AWS credentials for a
+real AWS account. The [lifecycle contract](docs/seeded-tasks.md) describes the required
+state handling and cleanup.
 
 Rendering, Compose configuration, and Harbor metadata were checked for the ten curated
 exports. Full Docker/Harbor lifecycle execution and adversarial isolation validation remain
