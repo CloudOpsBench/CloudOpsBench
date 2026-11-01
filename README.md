@@ -1,36 +1,42 @@
 # CloudOpsBench
 
-An open-source task suite for evaluating AI agents on cloud infrastructure operations.
-Tasks define the initial cloud state, the agent's objective, and the checks for success.
-One canonical task definition is used across execution backends; tests are not rewritten
-for the emulator.
+[![Tasks: 45](https://img.shields.io/badge/tasks-45-blue)](#tasks)
+![Cloud: AWS](https://img.shields.io/badge/cloud-AWS-FF9900)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 
-## Task format
+CloudOpsBench tests whether AI agents can handle cloud operations: fix broken services,
+remove unused resources, and tighten access without disrupting other workloads.
 
-The curated Harbor-style lifecycle layout is the only documented task contract:
+The suite includes 45 AWS tasks. Each comes with a setup script, instructions for the
+agent, automated checks, and a reference solution. The task logic and checks stay the
+same whether you use an emulator or AWS.
 
-```text
-tasks/aws/<task-id>/
-├── instruction.md
-├── task.toml
-├── environment/
-│   ├── Dockerfile                 # optional tool-image override
-│   └── lifecycle/
-│       ├── setup.sh
-│       ├── teardown.sh            # optional
-│       └── assets/                # optional
-├── tests/
-│   └── check.py
-└── solution/
-    └── solve.sh
+## Get started
+
+### Browse and validate the tasks
+
+Requires Git and Python 3.11+:
+
+```bash
+git clone https://github.com/CloudOpsBench/CloudOpsBench.git
+cd CloudOpsBench
+python3 scripts/validate.py
 ```
 
-Publish the original instructions, setup, grader, assets, and reference solution.
-The runner supplies execution scaffolding in a rendered copy: shared runtime dependencies,
-startup coordination, endpoint/credential configuration, and the Harbor reward entrypoint.
-Do not add emulator-only assertions, fixed dummy resource IDs, or endpoint guards to task
-logic. See the [task specification](docs/task-specification.md) and
-[lifecycle contract](docs/seeded-tasks.md).
+This checks task structure; it does not run agents or create cloud resources.
+
+### Choose an environment
+
+Tasks are designed to run against an AWS emulator such as **Vera** or a **real AWS account**,
+using the same setup scripts and checks. This repository provides the tasks; you supply
+an execution harness to run setup, the agent, and grading in your chosen environment.
+See the [lifecycle contract](docs/seeded-tasks.md) for integration details.
+
+For real AWS, use an isolated test account with scoped credentials and clean up resources
+after each run. Tasks can modify or delete resources and incur AWS charges.
+Never supply real AWS credentials to emulator containers.
+
+## Tasks
 
 The repository currently holds 45 tasks:
 
@@ -102,16 +108,41 @@ Canonical task → runner rendering → setup → agent → unchanged grader →
 - **0:** the grader explicitly fails.
 - **No valid reward:** setup or verifier execution error.
 
-The private [CloudOpsBenchRunner](https://github.com/CloudOpsBench/CloudOpsBenchRunner)
-currently executes tasks through Harbor 0.21.0 against a private AWS emulator. It supplies
-dummy credentials and an isolated emulator per trial. An AWS harness can consume the
-same task logic with scoped AWS credentials and cleanup; real-AWS orchestration is not
-implemented in this runner. Cloning this repository alone does not provide an execution
-backend. Never supply real credentials to emulator task containers.
+The execution harness must give setup, the agent, and the grader access to the same
+isolated environment. Use dummy credentials for Vera and scoped AWS credentials for a
+real AWS account. The [lifecycle contract](docs/seeded-tasks.md) describes the required
+state handling and cleanup.
 
 Rendering, Compose configuration, and Harbor metadata were checked for the ten curated
 exports. Full Docker/Harbor lifecycle execution and adversarial isolation validation remain
 release gates. No benchmark results are implied by those packaging checks.
+
+## Task format
+
+Tasks use this Harbor-style lifecycle layout:
+
+```text
+tasks/aws/<task-id>/
+├── instruction.md
+├── task.toml
+├── environment/
+│   ├── Dockerfile                 # optional tool-image override
+│   └── lifecycle/
+│       ├── setup.sh
+│       ├── teardown.sh            # optional
+│       └── assets/                # optional
+├── tests/
+│   └── check.py
+└── solution/
+    └── solve.sh
+```
+
+Publish the original instructions, setup, grader, assets, and reference solution.
+The runner supplies execution scaffolding in a rendered copy: shared runtime dependencies,
+startup coordination, endpoint/credential configuration, and the Harbor reward entrypoint.
+Do not add emulator-only assertions, fixed dummy resource IDs, or endpoint guards to task
+logic. See the [task specification](docs/task-specification.md) and
+[lifecycle contract](docs/seeded-tasks.md).
 
 ## Contributing
 
