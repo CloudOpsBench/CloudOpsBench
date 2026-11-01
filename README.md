@@ -1,36 +1,53 @@
 # CloudOpsBench
 
-An open-source task suite for evaluating AI agents on cloud infrastructure operations.
-Tasks define the initial cloud state, the agent's objective, and the checks for success.
-One canonical task definition is used across execution backends; tests are not rewritten
-for the emulator.
+[![Tasks: 45](https://img.shields.io/badge/tasks-45-blue)](#tasks)
+![Cloud: AWS](https://img.shields.io/badge/cloud-AWS-FF9900)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 
-## Task format
+CloudOpsBench tests whether AI agents can handle cloud operations: fix broken services,
+remove unused resources, and tighten access without disrupting other workloads.
 
-The curated Harbor-style lifecycle layout is the only documented task contract:
+The suite includes 45 AWS tasks. Each comes with a setup script, instructions for the
+agent, automated checks, and a reference solution. The task logic and checks stay the
+same whether you use an emulator or AWS.
 
-```text
-tasks/aws/<task-id>/
-├── instruction.md
-├── task.toml
-├── environment/
-│   ├── Dockerfile                 # optional tool-image override
-│   └── lifecycle/
-│       ├── setup.sh
-│       ├── teardown.sh            # optional
-│       └── assets/                # optional
-├── tests/
-│   └── check.py
-└── solution/
-    └── solve.sh
+## Get started
+
+### Browse and validate the tasks
+
+Requires Git and Python 3.11+:
+
+```bash
+git clone https://github.com/CloudOpsBench/CloudOpsBench.git
+cd CloudOpsBench
+python3 scripts/validate.py
 ```
 
-Publish the original instructions, setup, grader, assets, and reference solution.
-The runner supplies execution scaffolding in a rendered copy: shared runtime dependencies,
-startup coordination, endpoint/credential configuration, and the Harbor reward entrypoint.
-Do not add emulator-only assertions, fixed dummy resource IDs, or endpoint guards to task
-logic. See the [task specification](docs/task-specification.md) and
-[lifecycle contract](docs/seeded-tasks.md).
+This checks task structure; it does not run agents or create cloud resources.
+
+### Run a task
+
+Execution currently requires access to the private
+[CloudOpsBenchRunner](https://github.com/CloudOpsBench/CloudOpsBenchRunner) and its AWS
+emulator. Follow the runner's setup instructions first; this repository alone does not
+include an execution backend or a public push-button setup.
+
+From a configured runner checkout, pin a published task commit and run a reference-solution
+trial:
+
+```bash
+export TASKS_REF=REPLACE_WITH_PUBLISHED_COMMIT
+export TASK_ID=aws/disable-alarm-actions-for-maintenance
+uv run cobr list-tasks --tasks-ref "$TASKS_REF"
+uv run cobr run --tasks-ref "$TASKS_REF" --task "$TASK_ID" --harness oracle --seed 1 -k 1 -n 1 --no-upload
+```
+
+Confirm that the task exists at your pinned commit. The `oracle` harness runs the reference
+solution, not a model evaluation. See the runner documentation for agent configuration and
+the [validation procedure](docs/smoke-test.md) for negative controls and reward checks.
+Never supply real AWS credentials to emulator containers.
+
+## Tasks
 
 The repository currently holds 45 tasks:
 
@@ -112,6 +129,33 @@ backend. Never supply real credentials to emulator task containers.
 Rendering, Compose configuration, and Harbor metadata were checked for the ten curated
 exports. Full Docker/Harbor lifecycle execution and adversarial isolation validation remain
 release gates. No benchmark results are implied by those packaging checks.
+
+## Task format
+
+Tasks use this Harbor-style lifecycle layout:
+
+```text
+tasks/aws/<task-id>/
+├── instruction.md
+├── task.toml
+├── environment/
+│   ├── Dockerfile                 # optional tool-image override
+│   └── lifecycle/
+│       ├── setup.sh
+│       ├── teardown.sh            # optional
+│       └── assets/                # optional
+├── tests/
+│   └── check.py
+└── solution/
+    └── solve.sh
+```
+
+Publish the original instructions, setup, grader, assets, and reference solution.
+The runner supplies execution scaffolding in a rendered copy: shared runtime dependencies,
+startup coordination, endpoint/credential configuration, and the Harbor reward entrypoint.
+Do not add emulator-only assertions, fixed dummy resource IDs, or endpoint guards to task
+logic. See the [task specification](docs/task-specification.md) and
+[lifecycle contract](docs/seeded-tasks.md).
 
 ## Contributing
 
