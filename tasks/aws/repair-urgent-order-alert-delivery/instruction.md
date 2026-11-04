@@ -18,5 +18,5 @@ Constraints:
    (compliance audit records) that already arrives correctly and must keep
    arriving. Nothing about that existing flow may be lost or narrowed by
    your fix.
-3. Do not delete or recreate the topic or the queue. Do not touch resources
-   unrelated to this pipeline.
+3. Do not delete or recreate the topic, subscription, or queue. Do not touch
+   resources unrelated to this pipeline.

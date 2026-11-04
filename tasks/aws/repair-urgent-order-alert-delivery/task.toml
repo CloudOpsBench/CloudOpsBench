@@ -11,10 +11,11 @@ in uppercase or category ComplianceAudit, but urgent events are published with l
 outcome_description = """
 An event published with message attribute priority=urgent (lowercase) arrives in the queue as its
 plain JSON body, without the SNS envelope. Events with category ComplianceAudit still arrive, and
-the original topic and queue remain."""
+the original topic, subscription, and queue remain."""
 criteria_descriptions = [
   "the seeded topic still exists",
   "the seeded queue still exists",
+  "the seeded subscription still connects the seeded topic to the seeded queue",
   "the grader can publish probe messages to the topic",
   "a probe with message attribute priority=urgent (lowercase) reaches the queue before the polling deadline",
   "no message received during polling is wrapped in the SNS notification envelope",

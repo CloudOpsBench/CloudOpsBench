@@ -19,15 +19,36 @@ seed = ck.seed()
 
 TOPIC_ARN = seed["topic_arn"]
 QUEUE_URL = seed["queue_url"]
+QUEUE_ARN = seed["queue_arn"]
+SUBSCRIPTION_ARN = seed["subscription_arn"]
 
 try:
     sns.get_topic_attributes(TopicArn=TOPIC_ARN)
 except botocore.exceptions.ClientError:
     ck.fail("the fulfillment-alerts topic is gone; it must not be deleted or recreated")
 try:
-    sqs.get_queue_attributes(QueueUrl=QUEUE_URL, AttributeNames=["QueueArn"])
+    queue_attributes = sqs.get_queue_attributes(
+        QueueUrl=QUEUE_URL,
+        AttributeNames=["QueueArn", "CreatedTimestamp"],
+    )["Attributes"]
 except botocore.exceptions.ClientError:
     ck.fail("the escalation queue is gone; it must not be deleted or recreated")
+ck.require(queue_attributes.get("QueueArn") == QUEUE_ARN,
+           "the escalation queue ARN changed")
+ck.require(queue_attributes.get("CreatedTimestamp") == seed["queue_created_timestamp"],
+           "the escalation queue was deleted and recreated")
+
+subscriptions = sns.list_subscriptions_by_topic(TopicArn=TOPIC_ARN)["Subscriptions"]
+original_subscription = [
+    item for item in subscriptions
+    if item.get("SubscriptionArn") == SUBSCRIPTION_ARN
+]
+ck.require(
+    len(original_subscription) == 1
+    and original_subscription[0].get("Protocol") == "sqs"
+    and original_subscription[0].get("Endpoint") == QUEUE_ARN,
+    "the original topic-to-queue subscription was deleted, recreated, or repointed",
+)
 
 
 def publish(priority=None, category=None, marker=None):
