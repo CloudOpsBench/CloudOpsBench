@@ -20,7 +20,8 @@ QUEUE_URL=$(retry aws sqs create-queue --queue-name "$QUEUE" --query QueueUrl --
 read -r QUEUE_ARN QUEUE_CREATED_TIMESTAMP < <(retry aws sqs get-queue-attributes \
   --queue-url "$QUEUE_URL" --attribute-names QueueArn CreatedTimestamp \
   --query '[Attributes.QueueArn, Attributes.CreatedTimestamp]' --output text)
-[ -n "$QUEUE_ARN" ] && [ -n "$QUEUE_CREATED_TIMESTAMP" ] || {
+[ -n "$QUEUE_ARN" ] && [ "$QUEUE_ARN" != "None" ] &&
+  [ -n "$QUEUE_CREATED_TIMESTAMP" ] && [ "$QUEUE_CREATED_TIMESTAMP" != "None" ] || {
   echo "queue identity attributes were not returned" >&2
   exit 1
 }
