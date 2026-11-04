@@ -17,8 +17,14 @@ TOPIC_ARN=$(retry aws sns create-topic --name "$TOPIC" --query TopicArn --output
 STALE_TOPIC_ARN="arn:aws:sns:$REGION:$ACCT:fulfillment-alerts-topic-retired-$SFX"
 
 QUEUE_URL=$(retry aws sqs create-queue --queue-name "$QUEUE" --query QueueUrl --output text)
-QUEUE_ARN=$(aws sqs get-queue-attributes --queue-url "$QUEUE_URL" \
-  --attribute-names QueueArn --query Attributes.QueueArn --output text)
+read -r QUEUE_ARN QUEUE_CREATED_TIMESTAMP < <(retry aws sqs get-queue-attributes \
+  --queue-url "$QUEUE_URL" --attribute-names QueueArn CreatedTimestamp \
+  --query '[Attributes.QueueArn, Attributes.CreatedTimestamp]' --output text)
+[ -n "$QUEUE_ARN" ] && [ "$QUEUE_ARN" != "None" ] &&
+  [ -n "$QUEUE_CREATED_TIMESTAMP" ] && [ "$QUEUE_CREATED_TIMESTAMP" != "None" ] || {
+  echo "queue identity attributes were not returned" >&2
+  exit 1
+}
 
 python3 - "$QUEUE_ARN" "$STALE_TOPIC_ARN" > queue-policy.json <<'PY'
 import json
@@ -61,6 +67,7 @@ cat > seed_state.json <<EOF
   "topic_arn": "$TOPIC_ARN",
   "queue_url": "$QUEUE_URL",
   "queue_arn": "$QUEUE_ARN",
+  "queue_created_timestamp": "$QUEUE_CREATED_TIMESTAMP",
   "subscription_arn": "$SUB_ARN"
 }
 EOF
