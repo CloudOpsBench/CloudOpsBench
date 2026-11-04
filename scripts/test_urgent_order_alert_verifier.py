@@ -1,6 +1,10 @@
 """Local identity-preservation tests for the urgent-order alert verifier."""
+import os
 import runpy
+import stat
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 import types
 import unittest
@@ -10,6 +14,10 @@ from unittest.mock import patch
 CHECKER = (
     Path(__file__).resolve().parents[1]
     / "tasks/aws/repair-urgent-order-alert-delivery/tests/check.py"
+)
+SETUP = (
+    Path(__file__).resolve().parents[1]
+    / "tasks/aws/repair-urgent-order-alert-delivery/environment/lifecycle/setup.sh"
 )
 
 
@@ -101,6 +109,37 @@ def run_verifier(*, queue_created_timestamp="1000", subscription_arn="sub-origin
 
 
 class UrgentOrderAlertVerifierTests(unittest.TestCase):
+    def test_setup_rejects_none_queue_identity_attributes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            fake_aws = fake_bin / "aws"
+            fake_aws.write_text("""#!/usr/bin/env bash
+case "$*" in
+  "sts get-caller-identity --query Account --output text") echo 123456789012 ;;
+  "sns create-topic"*) echo arn:aws:sns:us-east-1:123456789012:test-topic ;;
+  "sqs create-queue"*) echo https://sqs.us-east-1.amazonaws.com/123456789012/test-queue ;;
+  "sqs get-queue-attributes"*) printf 'None\\tNone\\n' ;;
+  *) echo "unexpected aws call: $*" >&2; exit 1 ;;
+esac
+""")
+            fake_aws.chmod(fake_aws.stat().st_mode | stat.S_IXUSR)
+            env = os.environ.copy()
+            env["PATH"] = str(fake_bin) + os.pathsep + env["PATH"]
+
+            result = subprocess.run(
+                ["bash", str(SETUP)],
+                cwd=tmp,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("queue identity attributes were not returned", result.stderr)
+        self.assertNotIn("unexpected aws call", result.stderr)
+
     def test_original_resources_pass(self):
         self.assertIn("fully repaired", run_verifier())
 
