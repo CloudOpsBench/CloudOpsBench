@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check the Kinesis stream's resource policy by assuming each role and calling the API.
 
-The producer must be able to write, the analytics consumer must be able to read, and
-the outsider must be denied both.
+The producer must be able to write, the analytics consumer must be able to read but not
+write, and the outsider must be denied both. Writes are probed with PutRecord and
+PutRecords.
 """
 import json, os, subprocess, sys, time
 
@@ -27,8 +28,12 @@ def _aws(args):
         return False, str(e)
 
 
-def _assume_can_kinesis_put(role_arn, stream, region, retries=8, delay=5):
-    """Return True if role_arn can PutRecord to stream within the retry window."""
+def _assume_can_kinesis_put(role_arn, stream, region, retries=8, delay=5, batch=False):
+    """Return True if role_arn can PutRecord (or PutRecords) to stream within the retry window."""
+    if batch:
+        write = ["put-records", "--stream-name", stream, "--records", "Data=evt,PartitionKey=p1"]
+    else:
+        write = ["put-record", "--stream-name", stream, "--partition-key", "p1", "--data", "evt"]
     for _ in range(retries):
         ok, out = _aws(["sts", "assume-role", "--role-arn", role_arn,
                         "--role-session-name", "vera-grade"])
@@ -41,8 +46,7 @@ def _assume_can_kinesis_put(role_arn, stream, region, retries=8, delay=5):
             env["AWS_SESSION_TOKEN"] = creds["SessionToken"]
             try:
                 r = subprocess.run(
-                    ["aws", "kinesis", "put-record", "--stream-name", stream,
-                     "--partition-key", "p1", "--data", "evt",
+                    ["aws", "kinesis", *write,
                      "--cli-binary-format", "raw-in-base64-out", "--region", region],
                     capture_output=True, text=True, timeout=60, env=env,
                 )
@@ -95,6 +99,12 @@ def _assume_can_kinesis_read(role_arn, stream, region, retries=8, delay=5):
     return False
 
 
+def _assume_can_kinesis_write(role_arn, stream, region, retries=8, delay=5):
+    """Return True if role_arn can PutRecord or PutRecords to stream within the retry window."""
+    return any(_assume_can_kinesis_put(role_arn, stream, region, retries, delay, batch=batch)
+               for batch in (False, True))
+
+
 def fail(msg):
     print("FAIL: " + msg, file=sys.stderr)
     sys.exit(1)
@@ -115,12 +125,13 @@ ok, out = _aws(["kinesis", "describe-stream-summary", "--stream-name", stream])
 if not ok:
     fail(f"stream {stream} not found: {out[:160]}")
 
-# Allowed paths retry longer to cover policy propagation; the outsider is expected
-# to be denied, so it gets a shorter window.
+# Allowed paths retry longer to cover policy propagation; paths that must be denied
+# get a shorter window.
 producer_can_write = _assume_can_kinesis_put(producer_arn, stream, region, retries=8, delay=5)
 consumer_can_read = _assume_can_kinesis_read(consumer_arn, stream, region, retries=8, delay=5)
 outsider_can_read = _assume_can_kinesis_read(outsider_arn, stream, region, retries=2, delay=4)
-outsider_can_write = _assume_can_kinesis_put(outsider_arn, stream, region, retries=2, delay=4)
+outsider_can_write = _assume_can_kinesis_write(outsider_arn, stream, region, retries=2, delay=4)
+consumer_can_write = _assume_can_kinesis_write(consumer_arn, stream, region, retries=2, delay=4)
 
 problems = []
 if not producer_can_write:
@@ -139,11 +150,16 @@ if outsider_can_read or outsider_can_write:
         "vera-outsider can still access the stream — the wide-open account-root "
         "grant was not locked down"
     )
+if consumer_can_write:
+    problems.append(
+        "vera-analytics-consumer can write to the stream — only the producer may "
+        "PutRecord or PutRecords"
+    )
 
-if not (producer_can_write and consumer_can_read
+if not (producer_can_write and consumer_can_read and not consumer_can_write
         and not outsider_can_read and not outsider_can_write):
     fail("; ".join(problems) or "resource policy is not least-privilege")
 
 print(f"OK: {stream} resource policy is least-privilege — producer can write, "
-      f"analytics-consumer can read, outsider denied")
+      f"analytics-consumer can read but not write, outsider denied")
 sys.exit(0)
