@@ -1,4 +1,4 @@
-"""Run with python3 -m unittest discover -s scripts -p 'test_lifecycle_validator.py'."""
+"""Run with python3 -m unittest discover -s scripts -p 'test_*.py'."""
 import contextlib
 import io
 from pathlib import Path
