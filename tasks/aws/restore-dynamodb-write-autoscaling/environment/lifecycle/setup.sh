@@ -49,17 +49,18 @@ ddb.create_table(
     ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 2},
     Tags=[{"Key": "Project", "Value": "vera2"}])
 ddb.get_waiter("table_exists").wait(TableName=TABLE)
+TABLE_ID = ddb.describe_table(TableName=TABLE)["Table"]["TableId"]
 
 aas.register_scalable_target(ServiceNamespace="dynamodb", ResourceId=RID, ScalableDimension=DIM,
                              MinCapacity=2, MaxCapacity=2)
 
-aas.put_scaling_policy(
+POLICY_ARN = aas.put_scaling_policy(
     PolicyName=POLICY, ServiceNamespace="dynamodb", ResourceId=RID, ScalableDimension=DIM,
     PolicyType="TargetTrackingScaling",
     TargetTrackingScalingPolicyConfiguration={
         "TargetValue": 70.0,
         "PredefinedMetricSpecification": {"PredefinedMetricType": "DynamoDBWriteCapacityUtilization"},
-        "ScaleInCooldown": 60, "ScaleOutCooldown": 60})
+        "ScaleInCooldown": 60, "ScaleOutCooldown": 60})["PolicyARN"]
 
 trust = {"Version": "2012-10-17", "Statement": [
     {"Effect": "Allow", "Principal": {"Service": "scheduler.amazonaws.com"}, "Action": "sts:AssumeRole"}]}
@@ -93,7 +94,8 @@ while True:
 
 state = {
     "region": REGION, "suffix": SFX, "table": TABLE, "resource_id": RID, "dimension": DIM,
-    "policy": POLICY, "role": ROLE, "schedule": SCHEDULE, "want_min": 2, "want_max": 10,
+    "table_id": TABLE_ID, "policy": POLICY, "policy_arn": POLICY_ARN,
+    "role": ROLE, "schedule": SCHEDULE, "want_min": 2, "want_max": 10,
 }
 with open("seed_state.json", "w") as h:
     json.dump(state, h, indent=2, sort_keys=True)

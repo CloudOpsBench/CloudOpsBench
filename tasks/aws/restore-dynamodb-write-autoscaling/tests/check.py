@@ -3,7 +3,8 @@
 
 Passes when the table is still provisioned, the write-capacity scalable target is
 Min=2/Max=10, no enabled EventBridge Scheduler schedule re-registers the target with a
-lower maximum or with Min equal to Max, and the target-tracking policy is still present.
+lower maximum or with Min equal to Max, and the original table and target-tracking policy
+are still present.
 """
 import json
 
@@ -23,6 +24,8 @@ errors = []
 try:
     t = ddb.describe_table(TableName=state["table"])["Table"]
     bm = (t.get("BillingModeSummary") or {}).get("BillingMode", "PROVISIONED")
+    if t.get("TableId") != state["table_id"]:
+        errors.append("the original table was deleted and recreated; repair the existing table in place")
     if bm != "PROVISIONED":
         errors.append("the table is no longer PROVISIONED (billing=%s); keep it provisioned so it can "
                       "auto-scale write capacity" % bm)
@@ -83,12 +86,16 @@ except ClientError as e:
 try:
     pols = aas.describe_scaling_policies(ServiceNamespace="dynamodb", ResourceId=RID,
                                          ScalableDimension=DIM)["ScalingPolicies"]
-    if not any(p.get("PolicyType") == "TargetTrackingScaling" for p in pols):
-        errors.append("the target-tracking scaling policy is gone; it had to be kept so the table scales on "
-                      "utilization")
+    original = [p for p in pols if p.get("PolicyName") == state["policy"]]
+    if not original:
+        errors.append("the original target-tracking scaling policy was deleted or replaced")
+    elif original[0].get("PolicyARN") != state["policy_arn"]:
+        errors.append("the original target-tracking scaling policy was deleted and recreated")
+    elif original[0].get("PolicyType") != "TargetTrackingScaling":
+        errors.append("the original scaling policy is no longer a target-tracking policy")
 except ClientError as e:
     errors.append("could not read scaling policies (%s)" % e.response.get("Error", {}).get("Code"))
 
 ck.require(not errors, "; ".join(errors))
-ck.ok("write capacity is a scalable target with Min=2/Max=10, no schedule re-pins it, and the target-tracking "
-      "policy is intact — the table will now auto-scale and stay scalable")
+ck.ok("the original table and target-tracking policy are intact, write capacity is a scalable target with "
+      "Min=2/Max=10, and no schedule re-pins it — the table will now auto-scale and stay scalable")
