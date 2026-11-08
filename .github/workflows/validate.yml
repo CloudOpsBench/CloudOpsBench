@@ -23,7 +23,7 @@ jobs:
           python-version: "3.11"
       - name: Static checks
         run: python3 scripts/validate.py
-      - name: Validator unit tests
-        run: python3 -m unittest discover -s scripts -p 'test_lifecycle_validator.py'
+      - name: Unit tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Shell syntax
         run: find tasks -name '*.sh' -print0 | xargs -0 -n1 bash -n
