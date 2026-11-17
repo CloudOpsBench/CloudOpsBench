@@ -11,15 +11,16 @@ visible through the Kinesis API.
 """
 outcome_description = """
 The producer can write to the stream, the analytics consumer can still read it through the
-classic data-plane API, and the outsider can neither read nor write. Tightening the policy
-must not cut off the consumer.
+classic data-plane API but cannot write, and the outsider can neither read nor write.
+Tightening the policy must not cut off the consumer.
 """
 criteria_descriptions = [
   "the Kinesis stream exists and can be described",
   "the producer role, once assumed, can PutRecord to the stream",
   "the analytics consumer role, once assumed, can describe the stream, get a shard iterator and get records",
+  "the analytics consumer role, once assumed, can neither PutRecord nor PutRecords to the stream",
   "the outsider role, once assumed, cannot read records from the stream",
-  "the outsider role, once assumed, cannot PutRecord to the stream",
+  "the outsider role, once assumed, can neither PutRecord nor PutRecords to the stream",
 ]
 keywords = ["aws", "terraform", "kinesis", "iam", "security", "least-privilege"]
 extra_tools = []
