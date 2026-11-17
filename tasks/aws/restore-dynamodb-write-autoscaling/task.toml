@@ -9,17 +9,19 @@ target with minimum and maximum both 2, plus a target-tracking policy on write u
 separate enabled EventBridge Scheduler schedule, with its own IAM role, re-registers the target at
 2/2 every 30 minutes starting one day after setup, so widening the range alone gets reverted."""
 outcome_description = """
-The original table and target-tracking policy remain in place. The write-capacity scalable target
-has minimum 2 and maximum 10, and no enabled schedule would re-register it with a lower maximum
-or a fixed capacity. The table stays in provisioned billing mode."""
+The original table and target-tracking policy remain in place, and the policy still allows
+scale-in. The write-capacity scalable target has minimum 2 and maximum 10 with dynamic scaling not
+suspended, and no enabled schedule would re-register it with any other range or suspend its dynamic
+scaling. The table stays in provisioned billing mode."""
 criteria_descriptions = [
   "the original table still exists and its billing mode is PROVISIONED",
   "the table's write capacity is still a registered scalable target",
   "the scalable target has MinCapacity 2 and MaxCapacity 10",
-  "no enabled EventBridge Scheduler schedule calls RegisterScalableTarget for this table with MaxCapacity below 10",
-  "no enabled EventBridge Scheduler schedule calls RegisterScalableTarget for this table with MinCapacity equal to MaxCapacity",
+  "dynamic scaling in and out is not suspended on the scalable target",
+  "no enabled EventBridge Scheduler schedule, in any schedule group, calls RegisterScalableTarget for this table's write capacity with a MinCapacity other than 2, a MaxCapacity other than 10, or dynamic scaling suspended",
   "the original TargetTrackingScaling policy still exists on the table's write capacity",
-  "the table, scalable targets, schedule list and scaling policies can be read without an API error (schedules that cannot be read individually are skipped)",
+  "the original TargetTrackingScaling policy does not have scale-in disabled",
+  "the table, scalable targets, schedules and scaling policies can be read without an API error (a schedule deleted between listing and reading is skipped)",
 ]
 keywords = ["aws", "dynamodb", "application-autoscaling", "eventbridge-scheduler", "troubleshooting"]
 extra_tools = []
