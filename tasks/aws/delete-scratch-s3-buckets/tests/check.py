@@ -16,7 +16,7 @@ except Exception as error:
 
 left = [b for b in seed["general_buckets"] if b in gen] + [b for b in seed["dir_buckets"] if b in dirb]
 
-ck.require(
+ck.check(
     not left,
     "Not all vera2 S3 buckets were deleted. `aws s3api list-buckets` (and `aws s3 ls`) returns only "
     "general-purpose buckets; S3 Express One Zone DIRECTORY buckets are omitted and require "

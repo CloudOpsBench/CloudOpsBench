@@ -143,7 +143,7 @@ def main():
         QueueUrl=arch_url, AttributeNames=["Policy"])["Attributes"].get("Policy", "{}"))
     decided, allowed = ingest_can_send(iam, ingest_role_arn, arch_arn, arch_policy)
     if decided:
-        ck.require(
+        ck.check(
             allowed,
             "the evidence-ingest role (%s) can no longer send to the archiver queue: with the "
             "queue's access policy and the role's own identity policy evaluated together, over "
@@ -153,12 +153,12 @@ def main():
         q_allows, q_denies = queue_policy_verdict(
             arch_policy,
             [ingest_role_arn, "arn:aws:iam::%s:root" % seed["account"], seed["account"]])
-        ck.require(
+        ck.check(
             not q_denies,
             "the archiver queue's policy now explicitly DENIES sqs:SendMessage to the "
             "evidence-ingest role (%s); the prompt requires that role to still be able to "
             "send to this queue" % ingest_role_arn)
-        ck.require(
+        ck.check(
             q_allows or identity_policy_allows(iam, ingest_role, arch_arn),
             "the evidence-ingest role (%s) can no longer send to the archiver queue - "
             "neither the queue's access policy nor the role's own identity policy grants "
@@ -169,12 +169,12 @@ def main():
     for key, label in (("QueueConfigurations", "an SQS queue"),
                        ("TopicConfigurations", "an SNS topic"),
                        ("LambdaFunctionConfigurations", "a Lambda function")):
-        ck.require(
+        ck.check(
             not notif.get(key),
             "the bucket's notification configuration now delivers directly to %s. The "
             "prompt requires evidence events to be routed through EventBridge and "
             "forbids using a direct bucket notification as a substitute." % label)
-    ck.require(
+    ck.check(
         notif.get("EventBridgeConfiguration") is not None,
         "the bucket no longer sends object events to EventBridge - its "
         "EventBridgeConfiguration was removed by a notification-configuration "
@@ -190,13 +190,13 @@ def main():
     except Exception:
         ck.fail("the rule %s on %s was deleted - it handles an unrelated event flow "
                 "that must keep working" % (tagger, bus))
-    ck.require(rule.get("State") == "ENABLED",
-               "the rule %s is no longer ENABLED - the retention flow must keep "
-               "working" % tagger)
+    ck.check(rule.get("State") == "ENABLED",
+             "the rule %s is no longer ENABLED - the retention flow must keep "
+             "working" % tagger)
     tgts = events.list_targets_by_rule(Rule=tagger, EventBusName=bus).get("Targets", [])
-    ck.require(any(t.get("Arn") == seed["retention_queue_arn"] for t in tgts),
-               "the rule %s no longer targets the retention-worker queue - the "
-               "retention flow must keep working" % tagger)
+    ck.check(any(t.get("Arn") == seed["retention_queue_arn"] for t in tgts),
+             "the rule %s no longer targets the retention-worker queue - the "
+             "retention flow must keep working" % tagger)
 
     # Probe delivery, since a queue-policy Deny would block it without changing the rule.
     ret_token = "sealed-probe-%s" % uuid.uuid4().hex[:8]
@@ -214,7 +214,7 @@ def main():
         if any(ret_token in b for b in collect(sqs, ret_url, rounds=2, wait=10)):
             ret_ok = True
             break
-    ck.require(
+    ck.check(
         ret_ok,
         "acme.evidence / EvidenceSealed events published to %s no longer reach the "
         "retention-worker queue %s. The rule that routes them is still configured, so "
@@ -236,7 +236,7 @@ def main():
         if any(sns_token in b for b in got):
             sns_ok = True
             break
-    ck.require(
+    ck.check(
         sns_ok,
         "evidence alerts published to the intake topic %s do not reach the archiver "
         "queue. That topic is one of the sources feeding the archive, and the prompt "
@@ -258,7 +258,7 @@ def main():
         if any(rec_token in b for b in got):
             rec_ok = True
             break
-    ck.require(
+    ck.check(
         rec_ok,
         "acme.evidence / EvidenceRecorded events published to %s do not reach the "
         "archiver queue. The rule that matches them is enabled and on the right bus, "
@@ -280,7 +280,7 @@ def main():
         if any("evidence-sealer" in b for b in bodies):
             sealer_ok = True
             break
-    ck.require(
+    ck.check(
         sealer_ok,
         "running the %s state machine does not put its sealed-evidence record in the "
         "archiver queue. It is one of the sources feeding the archive: it completes "
@@ -345,7 +345,7 @@ def main():
         if len(seen) == len(probe_keys):
             break
     missing_keys = [k for k in probe_keys if k not in seen]
-    ck.require(
+    ck.check(
         not missing_keys,
         "objects written to %s under %d of 3 probed key prefixes produced no archive record "
         "of their own (%s), while others did reach %s. The prompt requires an object written "
@@ -360,7 +360,7 @@ def main():
             break
         archived.extend(collect(sqs, arch_url, rounds=3, wait=5))
         missing = [k for k in seed_objects if k not in "\n".join(archived)]
-    ck.require(
+    ck.check(
         not missing,
         "the archive is not complete: %d of the %d objects that were already in %s "
         "before the repair have no record in the archiver queue (%s). Repairing the "
@@ -399,7 +399,7 @@ def main():
     if any(s.get("Endpoint") == dlq_arn for s in subs):
         routed.append("the intake-alert topic is subscribed to it")
 
-    ck.require(
+    ck.check(
         not routed,
         "evidence is still routed into %s, which is a dead-letter queue and not the "
         "compliance archive: %s. The prompt requires evidence to land in %s."

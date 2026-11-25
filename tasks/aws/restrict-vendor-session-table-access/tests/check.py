@@ -427,9 +427,8 @@ for tname, tarn in ((seed["catalog_table"], CATALOG_ARN),
             _fails.append("the seeded item %s in table %s is no longer readable (%s)."
                           % (pk, tname, exc))
 
-if _fails:
-    ck.fail(" | ".join(_fails[:8]) + ("" if len(_fails) <= 8
-                                      else " | (+%d more)" % (len(_fails) - 8)))
+for _fail in _fails:
+    ck.check(False, _fail)
 ck.ok("no session any Meridian integration can obtain reads the pricing table; every "
       "integration keeps its catalog access through its existing path, and the shared "
       "role, the reconciliation path and the tables are unchanged")

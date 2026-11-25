@@ -114,6 +114,7 @@ try:
 except ClientError as e:
     errors.append("could not read scaling policies (%s)" % e.response.get("Error", {}).get("Code"))
 
-ck.require(not errors, "; ".join(errors))
+for error in errors:
+    ck.check(False, error)
 ck.ok("the original table and target-tracking policy are intact, write capacity is a scalable target with "
       "Min=2/Max=10, and no schedule re-pins it — the table will now auto-scale and stay scalable")

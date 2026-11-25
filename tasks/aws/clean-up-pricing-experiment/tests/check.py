@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 import boto3
+import checkkit as ck
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -142,38 +143,44 @@ except ClientError:
          f"only the experiment's prefix was in scope")
 
 if not _versions(keeper_prefix):
-    fail(f"the results under {keeper_prefix} in {bucket} were deleted — those are Finance's "
-         f"weekly revenue reports, not the experiment's")
+    ck.check(False,
+             f"the results under {keeper_prefix} in {bucket} were deleted — those are Finance's "
+             f"weekly revenue reports, not the experiment's")
 if _versions(keeper_prefix, "DeleteMarkers"):
-    fail(f"a delete marker was written over {keeper_prefix} — Finance's reports must stay readable")
+    ck.check(False,
+             f"a delete marker was written over {keeper_prefix} — Finance's reports must stay readable")
 
 try:
     _aps = _access_point_names()
 except ClientError as e:
     fail(f"could not list access points to verify Finance's is intact: {e}")
 if keeper_ap not in _aps:
-    fail(f"the access point {keeper_ap} was deleted — Finance reads their results through it")
+    ck.check(False,
+             f"the access point {keeper_ap} was deleted — Finance reads their results through it")
 
 try:
     _wgs = _work_group_names()
 except ClientError as e:
     fail(f"could not list Athena workgroups to verify Finance's is intact: {e}")
 if keeper_wg not in _wgs:
-    fail(f"the Athena workgroup {keeper_wg} was deleted — Finance's reporting queries run in it")
+    ck.check(False,
+             f"the Athena workgroup {keeper_wg} was deleted — Finance's reporting queries run in it")
 
 try:
     _k = sec.describe_secret(SecretId=keeper_secret)
     if _k.get("DeletedDate"):
-        fail(f"the secret {keeper_secret} was scheduled for deletion — it is Finance's warehouse "
-             f"DSN, not the experiment's pricing key")
+        ck.check(False,
+                 f"the secret {keeper_secret} was scheduled for deletion — it is Finance's warehouse "
+                 f"DSN, not the experiment's pricing key")
 except ClientError:
-    fail(f"the secret {keeper_secret} was deleted — it is Finance's warehouse DSN, not the "
-         f"experiment's pricing key")
+    ck.check(False,
+             f"the secret {keeper_secret} was deleted — it is Finance's warehouse DSN, not the "
+             f"experiment's pricing key")
 
 try:
     iam.get_role(RoleName=keeper_role)
 except ClientError:
-    fail(f"the IAM role {keeper_role} was deleted — Finance's reporting runs as it")
+    ck.check(False, f"the IAM role {keeper_role} was deleted — Finance's reporting runs as it")
 
 
 # Poll for up to 60s to allow for async deletion and eventually consistent reads.
@@ -257,12 +264,12 @@ while True:
         break
     time.sleep(5)
 
-if _remaining:
-    fail(_remaining[0][1])
+for _fn, _msg in _remaining:
+    ck.check(False, _msg)
 
 
-print(
-    f"PASS: nothing the pricing experiment produced or used remains — no result sets, delete "
+ck.ok(
+    f"nothing the pricing experiment produced or used remains — no result sets, delete "
     f"markers or unfinished uploads under {target_prefix} in {bucket}, and the access point, "
     f"workgroup and query role are gone. The pricing API key is destroyed rather than left "
     f"recoverable. Finance's weekly revenue reporting keeps its bucket, its results, its access "

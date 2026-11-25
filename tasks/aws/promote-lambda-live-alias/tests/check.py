@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json, os, subprocess, sys
 
+import checkkit as ck
+
 REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
 
 
@@ -75,8 +77,7 @@ elif not esm_on_new:
     problems.append("the event-source mapping still invokes old code — it was left pinned to the "
                     "old version; the hidden consumer is stranded on stale code (reverse-lookup not performed)")
 
-if problems:
-    fail("; ".join(problems))
+for problem in problems:
+    ck.check(False, problem)
 
-print(f"OK: `live` promoted to new code and the hidden SQS ESM (state {state}) tracks it")
-sys.exit(0)
+ck.ok(f"`live` promoted to new code and the hidden SQS ESM (state {state}) tracks it")

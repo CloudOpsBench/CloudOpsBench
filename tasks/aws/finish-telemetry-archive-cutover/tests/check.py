@@ -350,7 +350,7 @@ def replication_status(client, bucket, key):
 
 
 for bucket, key, where, what in WANT:
-    ck.require(
+    ck.check(
         (bucket, key) in landed,
         "%s from %s must be delivering, but a probe object written to it at %s had not "
         "reached %s after %d seconds. S3 reports ReplicationStatus=%s on the source object, "
@@ -363,11 +363,10 @@ for bucket, key, where, what in WANT:
 time.sleep(25)
 hit = legacy_received()
 if hit:
-    ck.fail(hit)
+    ck.check(False, hit)
 
-if _deferred:
-    ck.fail("%d configuration requirement(s) were not met. First: %s"
-            % (len(_deferred), _deferred[0]))
+for msg in _deferred:
+    ck.check(False, msg)
 
 ck.ok("nothing writes into %s any more; the compliance feed, the raw delivery stream, the "
       "nightly partner sync, the flow log and the access logs all work against the "

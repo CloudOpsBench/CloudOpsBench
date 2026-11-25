@@ -67,9 +67,9 @@ def _keep_unchanged():
                     % KEEP)
         ck.fail("could not confirm %s survived: %s" % (KEEP, e.response["Error"]["Code"]))
     if KEEP_TRUST is not None:
-        ck.require(_norm(now.get("AssumeRolePolicyDocument")) == _norm(KEEP_TRUST),
-                   "the trust policy of %s was modified; that role never named the retired role and was to "
-                   "be left exactly as handed over" % KEEP)
+        ck.check(_norm(now.get("AssumeRolePolicyDocument")) == _norm(KEEP_TRUST),
+                 "the trust policy of %s was modified; that role never named the retired role and was to "
+                 "be left exactly as handed over" % KEEP)
     if KEEP_INLINE:
         try:
             names_now = set()
@@ -77,18 +77,18 @@ def _keep_unchanged():
                 names_now.update(pg.get("PolicyNames", []))
         except ClientError as e:
             ck.fail("could not read the inline policies of %s: %s" % (KEEP, e.response["Error"]["Code"]))
-        ck.require(names_now == set(KEEP_INLINE),
-                   "the inline policies of %s changed (expected %s, found %s); that role was to be left "
-                   "exactly as handed over" % (KEEP, sorted(KEEP_INLINE), sorted(names_now)))
+        ck.check(names_now == set(KEEP_INLINE),
+                 "the inline policies of %s changed (expected %s, found %s); that role was to be left "
+                 "exactly as handed over" % (KEEP, sorted(KEEP_INLINE), sorted(names_now)))
         for pname, doc in KEEP_INLINE.items():
             try:
                 cur = iam.get_role_policy(RoleName=KEEP, PolicyName=pname)["PolicyDocument"]
             except ClientError as e:
                 ck.fail("could not read inline policy %r of %s: %s"
                         % (pname, KEEP, e.response["Error"]["Code"]))
-            ck.require(_norm(cur) == _norm(doc),
-                       "the inline policy %r of %s was rewritten; that role was to be left exactly as "
-                       "handed over" % (pname, KEEP))
+            ck.check(_norm(cur) == _norm(doc),
+                     "the inline policy %r of %s was rewritten; that role was to be left exactly as "
+                     "handed over" % (pname, KEEP))
     if KEEP_SURFACE:
         now_attached = []
         try:
@@ -103,10 +103,10 @@ def _keep_unchanged():
                        "tags": sorted([t["Key"], t["Value"]] for t in now.get("Tags") or []),
                        "attached": sorted(now_attached)}
         for field, was in KEEP_SURFACE.items():
-            ck.require(_canon(surface_now.get(field)) == _canon(was),
-                       "the %s of %s changed (was %r, now %r); that role never named the retired role and "
-                       "was to be left exactly as handed over"
-                       % (field.replace("_", " "), KEEP, was, surface_now.get(field)))
+            ck.check(_canon(surface_now.get(field)) == _canon(was),
+                     "the %s of %s changed (was %r, now %r); that role never named the retired role and "
+                     "was to be left exactly as handed over"
+                     % (field.replace("_", " "), KEEP, was, surface_now.get(field)))
 
 
 def _audit_account():
@@ -116,32 +116,32 @@ def _audit_account():
             for r in page.get("RoleDetailList", []):
                 if (r.get("Path") or "/").startswith("/aws-service-role/"):
                     continue
-                ck.require(not _mentions(r.get("AssumeRolePolicyDocument")),
-                           "the trust policy of %s still names %s; the audit is to leave nothing in the "
-                           "account naming that role" % (r["RoleName"], RETIRED))
+                ck.check(not _mentions(r.get("AssumeRolePolicyDocument")),
+                         "the trust policy of %s still names %s; the audit is to leave nothing in the "
+                         "account naming that role" % (r["RoleName"], RETIRED))
                 for pol in r.get("RolePolicyList", []):
-                    ck.require(not _mentions(pol.get("PolicyDocument")),
-                               "the inline policy %r of %s still names %s; the audit is to leave nothing "
-                               "in the account naming that role"
-                               % (pol.get("PolicyName"), r["RoleName"], RETIRED))
+                    ck.check(not _mentions(pol.get("PolicyDocument")),
+                             "the inline policy %r of %s still names %s; the audit is to leave nothing "
+                             "in the account naming that role"
+                             % (pol.get("PolicyName"), r["RoleName"], RETIRED))
             for kind, listing, holder, policies in (
                     ("user", "UserDetailList", "UserName", "UserPolicyList"),
                     ("group", "GroupDetailList", "GroupName", "GroupPolicyList")):
                 for ident in page.get(listing, []):
                     for pol in ident.get(policies, []):
-                        ck.require(not _mentions(pol.get("PolicyDocument")),
-                                   "the inline policy %r of %s %s still names %s; the audit is to leave "
-                                   "nothing in the account naming that role"
-                                   % (pol.get("PolicyName"), kind, ident[holder], RETIRED))
+                        ck.check(not _mentions(pol.get("PolicyDocument")),
+                                 "the inline policy %r of %s %s still names %s; the audit is to leave "
+                                 "nothing in the account naming that role"
+                                 % (pol.get("PolicyName"), kind, ident[holder], RETIRED))
             for pol in page.get("Policies", []):
                 for v in pol.get("PolicyVersionList", []):
                     if v.get("IsDefaultVersion"):
-                        ck.require(not _mentions(v.get("Document")),
-                                   "the customer-managed policy %s still names %s; the audit is to leave "
-                                   "nothing in the account naming that role"
-                                   % (pol.get("PolicyName"), RETIRED))
+                        ck.check(not _mentions(v.get("Document")),
+                                 "the customer-managed policy %s still names %s; the audit is to leave "
+                                 "nothing in the account naming that role"
+                                 % (pol.get("PolicyName"), RETIRED))
     except ClientError as e:
-        ck.fail("could not audit the account's IAM configuration: %s" % e.response["Error"]["Code"])
+        ck.check(False, "could not audit the account's IAM configuration: %s" % e.response["Error"]["Code"])
 
 
 def associated():
@@ -175,9 +175,9 @@ if current:
                     "for another is not a repair" % role_name)
         ck.fail("could not confirm the role named by the association exists: %s"
                 % e.response["Error"]["Code"])
-    ck.require(_predates_handover(role_name),
-               "the association now names %r, a role that was not in this account at hand-over; the task "
-               "states no new role is to be created" % role_name)
+    ck.check(_predates_handover(role_name),
+             "the association now names %r, a role that was not in this account at hand-over; the task "
+             "states no new role is to be created" % role_name)
 
 try:
     iam.get_role(RoleName=RETIRED)
@@ -187,9 +187,9 @@ except ClientError as e:
         recreated = False
     else:
         ck.fail("could not confirm the deleted role stayed deleted: %s" % e.response["Error"]["Code"])
-ck.require(not recreated,
-           "the role %s was re-created; the decommissioning removed it on purpose and a name that comes "
-           "back to life is the hazard, not the repair" % RETIRED)
+ck.check(not recreated,
+         "the role %s was re-created; the decommissioning removed it on purpose and a name that comes "
+         "back to life is the hazard, not the repair" % RETIRED)
 
 _keep_unchanged()
 _audit_account()

@@ -10,6 +10,9 @@ import types
 import unittest
 from unittest.mock import patch
 
+import fake_checkkit
+from fake_checkkit import VerificationFailure
+
 
 CHECKER = (
     Path(__file__).resolve().parents[1]
@@ -19,10 +22,6 @@ SETUP = (
     Path(__file__).resolve().parents[1]
     / "tasks/aws/repair-urgent-order-alert-delivery/environment/lifecycle/setup.sh"
 )
-
-
-class VerificationFailure(AssertionError):
-    pass
 
 
 class FakeSNS:
@@ -74,24 +73,11 @@ def run_verifier(*, queue_created_timestamp="1000", subscription_arn="sub-origin
         "queue_created_timestamp": "1000",
         "subscription_arn": "sub-original",
     }
-    state = {"seed": seed, "ok": None}
+    state = {"seed": seed}
 
     sns = FakeSNS(state, subscription_arn)
     sqs = FakeSQS(state, queue_created_timestamp)
-    checkkit = types.ModuleType("checkkit")
-    checkkit.client = lambda name: {"sns": sns, "sqs": sqs}[name]
-    checkkit.seed = lambda: seed
-
-    def fail(message):
-        raise VerificationFailure(message)
-
-    def require(condition, message):
-        if not condition:
-            raise VerificationFailure(message)
-
-    checkkit.fail = fail
-    checkkit.require = require
-    checkkit.ok = lambda message: state.__setitem__("ok", message)
+    checkkit = fake_checkkit.build({"sns": sns, "sqs": sqs}, seed)
 
     botocore = types.ModuleType("botocore")
     exceptions = types.ModuleType("botocore.exceptions")
@@ -105,7 +91,7 @@ def run_verifier(*, queue_created_timestamp="1000", subscription_arn="sub-origin
     }
     with patch.dict(sys.modules, modules):
         runpy.run_path(str(CHECKER), run_name="__main__")
-    return state["ok"]
+    return checkkit.ok_message
 
 
 class UrgentOrderAlertVerifierTests(unittest.TestCase):
@@ -150,6 +136,12 @@ esac
     def test_recreated_topic_or_subscription_fails(self):
         with self.assertRaisesRegex(VerificationFailure, "subscription was deleted"):
             run_verifier(subscription_arn="sub-replacement")
+
+    def test_every_failure_is_reported(self):
+        with self.assertRaises(VerificationFailure) as caught:
+            run_verifier(queue_created_timestamp="2000", subscription_arn="sub-replacement")
+        self.assertIn("deleted and recreated", str(caught.exception))
+        self.assertIn("subscription was deleted", str(caught.exception))
 
 
 if __name__ == "__main__":

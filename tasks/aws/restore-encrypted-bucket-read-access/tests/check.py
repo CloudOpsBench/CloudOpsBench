@@ -7,7 +7,6 @@ kms:Decrypt scoped to that key, the boundary has no wildcard Allow and still per
 the S3 read, the role keeps its S3 read access, and the archive bucket is still AES256.
 """
 import json
-import sys
 import checkkit as ck
 from botocore.exceptions import ClientError
 
@@ -55,12 +54,12 @@ def doc_has_wildcard_allow(doc):
 
 
 head = s3.head_object(Bucket=data_bucket, Key="reports/q1.txt")
-ck.require(
+ck.check(
     head.get("ServerSideEncryption") == "aws:kms",
     "Data object is no longer SSE-KMS encrypted — encryption must not be changed"
 )
 obj_key = head.get("SSEKMSKeyId", "")
-ck.require(
+ck.check(
     key_id in obj_key or obj_key == key_arn,
     "Data object is no longer encrypted with the original CMK"
 )
@@ -81,11 +80,11 @@ for pname in iam.list_role_policies(RoleName=app_role)["PolicyNames"]:
         ):
             s3_read_intact = True
 
-ck.require(
+ck.check(
     identity_ok,
     "Role identity policy does not grant kms:Decrypt scoped to the data key (wildcard resources don't count)"
 )
-ck.require(s3_read_intact, "Role's original S3 read access to the data bucket was removed")
+ck.check(s3_read_intact, "Role's original S3 read access to the data bucket was removed")
 
 role = iam.get_role(RoleName=app_role)["Role"]
 pb = role.get("PermissionsBoundary", {})
@@ -101,12 +100,12 @@ bdoc = iam.get_policy_version(PolicyArn=boundary_arn, VersionId=ver)["PolicyVers
 boundary_decrypt_ok = any(
     stmt_allows_decrypt_scoped(stmt, key_arn, key_id) for stmt in bdoc.get("Statement", [])
 )
-ck.require(
+ck.check(
     boundary_decrypt_ok,
     "Permissions boundary does not permit kms:Decrypt for the data key — effective permissions "
     "are the intersection of identity policy and boundary, so both must allow it"
 )
-ck.require(
+ck.check(
     not doc_has_wildcard_allow(bdoc),
     "Permissions boundary was blown open with a broad wildcard Allow — it must be extended minimally"
 )
@@ -117,18 +116,17 @@ boundary_s3_ok = any(
     and any(data_bucket in r for r in as_list(stmt.get("Resource")))
     for stmt in bdoc.get("Statement", [])
 )
-ck.require(boundary_s3_ok, "Permissions boundary no longer permits the original S3 read access")
+ck.check(boundary_s3_ok, "Permissions boundary no longer permits the original S3 read access")
 
 try:
     enc = s3.get_bucket_encryption(Bucket=archive_bucket)
     algo = enc["ServerSideEncryptionConfiguration"]["Rules"][0][
         "ApplyServerSideEncryptionByDefault"
     ]["SSEAlgorithm"]
-    ck.require(algo == "AES256", "Archive bucket encryption was modified — it was working as intended")
+    ck.check(algo == "AES256", "Archive bucket encryption was modified — it was working as intended")
 except ClientError as e:
     code = e.response.get("Error", {}).get("Code", "")
     if code != "ServerSideEncryptionConfigurationNotFoundError":
         raise
 
-print("All checks passed.")
-sys.exit(0)
+ck.ok("All checks passed.")

@@ -5,6 +5,8 @@ Fails on allowAll, denyAll, a missing main or retry queue ARN, or a wildcard sou
 """
 import json, os, subprocess, sys
 
+import checkkit as ck
+
 REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
 
 
@@ -79,7 +81,7 @@ if has_wildcard:
     problems.append("sourceQueueArns contains a wildcard — not least privilege")
 
 if not (perm == "byQueue" and main_ok and retry_ok and not has_wildcard):
-    fail("; ".join(problems) or "redrive-allow policy is not least-privilege byQueue")
+    for problem in problems or ["redrive-allow policy is not least-privilege byQueue"]:
+        ck.check(False, problem)
 
-print(f"OK: {DLQ} redrive-allow is byQueue permitting vera-orders-main + vera-orders-retry (no wildcard)")
-sys.exit(0)
+ck.ok(f"{DLQ} redrive-allow is byQueue permitting vera-orders-main + vera-orders-retry (no wildcard)")

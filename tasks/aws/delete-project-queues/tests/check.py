@@ -27,7 +27,7 @@ def list_sqs_queues():
 
 # MediaConvert listing is strongly consistent, so it is checked first.
 mc_left = list_mediaconvert_queues()
-ck.require(
+ck.check(
     not mc_left,
     "Some vera2 queues still exist. A complete queue cleanup must cover every service that provides queues, "
     "including AWS Elemental MediaConvert — its queues are listed by `mediaconvert list-queues` (not "
@@ -41,6 +41,6 @@ for _ in range(12):
         break
     time.sleep(5)
     sqs_left = list_sqs_queues()
-ck.require(not sqs_left, "Some vera2 SQS queues still exist: %s" % ", ".join(sqs_left))
+ck.check(not sqs_left, "Some vera2 SQS queues still exist: %s" % ", ".join(sqs_left))
 
 ck.ok("no vera2 queues remain (SQS and MediaConvert both checked)")

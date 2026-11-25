@@ -24,7 +24,13 @@ resources specified by the task rather than read private setup state.
 Harbor uploads `tests/` for verification. The runner executes the unchanged `tests/check.py`
 as root in the same private working directory used by setup. `checkkit` provides the helper
 API used by the curated exports: `region`, `account_id`, `client`, `resource`, `seed`,
-`as_list`, `require`, `fail`, and `ok`.
+`as_list`, `check`, `require`, `fail`, and `ok`.
+
+`ck.check(condition, message)` takes the same arguments as `ck.require` but records the
+result and continues, so one run reports every failed condition; `ck.ok(...)` then fails
+the run if any check failed. `ck.require` and `ck.fail` stop the grader and are only for
+conditions the remaining checks cannot run without. The runner writes the per-check
+results to `/logs/verifier/checks.json`; the reward stays binary.
 
 Setup, agent, and grader address the same cloud scope. The runner supplies credentials
 and endpoint routing. The task does not hardcode emulator endpoints or dummy identity.

@@ -27,7 +27,7 @@ except botocore.exceptions.ClientError as e:
         % (LABEL, PARAM, e.response["Error"]["Code"]),
     )
 
-ck.require(
+ck.check(
     resolved == NEW,
     "the checkout service still loads the OLD database endpoint (%r). It resolves /…/checkout/db-endpoint "
     "through the '%s' release label, which is still pinned to the legacy version. Overwriting the "

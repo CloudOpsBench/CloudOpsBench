@@ -19,8 +19,8 @@ except botocore.exceptions.ClientError:
 objs = []
 for page in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET):
     objs += [o["Key"] for o in page.get("Contents", [])]
-ck.require(not objs, "the bucket %s still holds objects (%s) — the pilot's data was not removed."
-                     % (BUCKET, ", ".join(sorted(objs)[:3])))
+ck.check(not objs, "the bucket %s still holds objects (%s) — the pilot's data was not removed."
+                   % (BUCKET, ", ".join(sorted(objs)[:3])))
 
 # Parts of an in-progress multipart upload don't show up in list_objects_v2.
 uploads = []
@@ -44,7 +44,7 @@ if still:
         "`s3api list-multipart-uploads --bucket %s` shows it. Free it with `s3api abort-multipart-upload "
         "--bucket %s --key %s --upload-id %s`." % (UPLOAD_KEY, BUCKET, BUCKET, UPLOAD_KEY, UPLOAD_ID)
     )
-ck.require(not still, msg)
+ck.check(not still, msg)
 
 ck.ok("none of the pilot's data is still stored in the bucket — the objects are gone and no in-progress "
       "multipart upload is holding parts; the bucket itself is intact")

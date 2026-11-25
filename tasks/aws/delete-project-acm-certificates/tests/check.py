@@ -16,7 +16,7 @@ def exists(arn):
 
 still = [c for c in seed["certs"] if exists(c["arn"])]
 
-ck.require(
+ck.check(
     not still,
     "Not all vera2 ACM certificates were deleted. `aws acm list-certificates` returns only RSA_1024/RSA_2048 "
     "certs by default (Includes.keyTypes); RSA_4096 and EC certs are omitted unless --includes keyTypes=... "

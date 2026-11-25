@@ -228,7 +228,8 @@ if missing:
         for g, v in sorted(per_group.items())
     )
     arrived = sorted({g for g, _ in seen if g != VENDOR}) or ["nothing"]
-    ck.fail(
+    ck.check(
+        False,
         f"log events written to the /svc/ log groups did not all reach the audit stream named "
         f"audit-relay-stream-* in their own region within {int(time.time() - sent_at)}s. "
         f"{detail}. Lines written at the same moment from {', '.join(arrived)} did arrive, so "
@@ -248,7 +249,8 @@ while time.time() < grace:
     time.sleep(6)
     drain()
 if vendor_hits:
-    ck.fail(
+    ck.check(
+        False,
         f"events written to {VENDOR} reached the audit relay: {vendor_hits[0]}. The task states "
         f"that this log group's events must never reach the audit relay, while every other "
         f"/svc/ log group's must"
@@ -256,7 +258,7 @@ if vendor_hits:
 
 for r in REGIONS:
     pf = logs[r].describe_subscription_filters(logGroupName=PROBE[r])["subscriptionFilters"]
-    ck.require(
+    ck.check(
         not pf,
         f"{PROBE[r]} was created by the grader in {r} after the work finished, and something "
         f"then configured the subscription filter(s) {[f['filterName'] for f in pf]!r} on the "
@@ -276,7 +278,7 @@ for r in REGIONS:
         )
         want = SEEDED[g].get("retentionInDays")
         got = cur.get("retentionInDays")
-        ck.require(
+        ck.check(
             want == got,
             f"log group {g} in {r} is set to retain events for {got} days; it was seeded at "
             f"{want} days and the task states that every /svc/ log group keeps the retention "
@@ -286,20 +288,20 @@ for r in REGIONS:
 cur = present[REGION][VENDOR]
 was = SEEDED[VENDOR]
 for field in ("creationTime", "logGroupClass", "kmsKeyId", "dataProtectionStatus"):
-    ck.require(
+    ck.check(
         cur.get(field) == was.get(field),
         f"{VENDOR} has {field}={cur.get(field)!r}, seeded as {was.get(field)!r}; the task "
         f"states that this log group is otherwise left exactly as it is",
     )
 now_tags = logs[REGION].list_tags_for_resource(resourceArn=was["arn"]).get("tags", {})
-ck.require(
+ck.check(
     now_tags == was.get("tags", {}),
     f"{VENDOR} now carries the tags {now_tags!r}, seeded with {was.get('tags', {})!r}; the task "
     f"states that this log group is otherwise left exactly as it is",
 )
 vendor_filters = logs[REGION].describe_subscription_filters(
     logGroupName=VENDOR)["subscriptionFilters"]
-ck.require(
+ck.check(
     not vendor_filters,
     f"{VENDOR} now carries the subscription filter(s) "
     f"{[f['filterName'] for f in vendor_filters]!r}; it was seeded with none and the task "
@@ -309,12 +311,12 @@ ck.require(
 for r, arn_key, created_key in ((REGION, "stream_arn", "stream_created"),
                                 (WEST, "west_stream_arn", "west_stream_created")):
     sd = kin[r].describe_stream(StreamName=STREAM[r])["StreamDescription"]
-    ck.require(
+    ck.check(
         sd["StreamARN"] == seed[arn_key],
         f"the audit stream {STREAM[r]} in {r} now has ARN {sd['StreamARN']}, seeded as "
         f"{seed[arn_key]}; the task states that it must not be deleted or replaced",
     )
-    ck.require(
+    ck.check(
         sd["StreamCreationTimestamp"].isoformat() == seed[created_key],
         f"the audit stream {STREAM[r]} in {r} was created at "
         f"{sd['StreamCreationTimestamp'].isoformat()}, seeded at {seed[created_key]}, so it was "
@@ -330,7 +332,7 @@ except Exception as exc:  # noqa: BLE001
         f"the relay role {seed['role_name']} no longer exists ({type(exc).__name__}); the task "
         f"states that it must not be deleted or replaced"
     )
-ck.require(
+ck.check(
     role["RoleId"] == seed["role_id"],
     f"the relay role {seed['role_name']} now has RoleId {role['RoleId']}, seeded as "
     f"{seed['role_id']}, so it was deleted and rebuilt under the same name; the task states "
