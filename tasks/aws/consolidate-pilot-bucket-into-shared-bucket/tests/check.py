@@ -66,12 +66,12 @@ require_bucket(source)
 require_bucket(destination)
 
 left_objects = object_keys(source)
-ck.require(
+ck.check(
     not left_objects,
     f"source bucket {source} still contains object(s): {', '.join(left_objects[:5])}",
 )
 left_uploads = multipart_uploads(source)
-ck.require(
+ck.check(
     not left_uploads,
     f"source bucket {source} still contains in-progress multipart data: "
     + ", ".join(key for key, _ in left_uploads[:5]),
@@ -81,20 +81,20 @@ expected = dict(seed["payloads"])
 sentinel = seed["shared_sentinel"]
 expected[sentinel["key"]] = {"sha256": sentinel["sha256"], "size": sentinel["size"]}
 observed_keys = object_keys(destination)
-ck.require(
+ck.check(
     observed_keys == sorted(expected),
     f"shared bucket has the wrong key set; expected {sorted(expected)}, observed {observed_keys}",
 )
 for key, wanted in sorted(expected.items()):
     observed = evidence(destination, key)
-    ck.require(observed is not None, f"shared bucket is missing {key}")
-    ck.require(
+    ck.check(observed is not None, f"shared bucket is missing {key}")
+    ck.check(
         observed == wanted,
         f"payload integrity failed for {key}: expected {wanted}, observed {observed}",
     )
 
 destination_uploads = multipart_uploads(destination)
-ck.require(
+ck.check(
     not destination_uploads,
     "shared bucket contains unfinished multipart data instead of only the completed dataset",
 )

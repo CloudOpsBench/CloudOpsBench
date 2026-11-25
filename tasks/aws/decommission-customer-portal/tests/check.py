@@ -89,6 +89,7 @@ if not any(arn.endswith(":" + BILLING_TOPIC) for arn in topics):
 if BILLING_GROUP not in groups:
     problems.append("the billing workload's log group %s was removed" % BILLING_GROUP)
 
-ck.require(not problems, "; ".join(sorted(problems)))
+for problem in sorted(problems):
+    ck.check(False, problem)
 ck.ok("nothing belonging to the portal survives, including on the Well-Architected plane, and every one "
       "of the billing workload's own resources is still in place")

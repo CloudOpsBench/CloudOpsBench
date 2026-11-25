@@ -7,16 +7,15 @@ import types
 import unittest
 from unittest.mock import patch
 
+import fake_checkkit
+from fake_checkkit import VerificationFailure
+
 
 CHECKER = (
     Path(__file__).resolve().parents[1]
     / "tasks/aws/restore-dynamodb-write-autoscaling/tests/check.py"
 )
 REGISTER_ARN = "arn:aws:scheduler:::aws-sdk:applicationautoscaling:registerScalableTarget"
-
-
-class VerificationFailure(AssertionError):
-    pass
 
 
 class FakeClientError(Exception):
@@ -121,7 +120,6 @@ def run_verifier(
         "want_min": 2,
         "want_max": 10,
     }
-    ok = {"message": None}
     clients = {
         "dynamodb": FakeDynamoDB(table_id),
         "application-autoscaling": FakeApplicationAutoScaling(
@@ -138,16 +136,7 @@ def run_verifier(
         "scheduler": FakeScheduler(schedules or {}),
     }
 
-    checkkit = types.ModuleType("checkkit")
-    checkkit.client = lambda name: clients[name]
-    checkkit.seed = lambda: seed
-
-    def require(condition, message):
-        if not condition:
-            raise VerificationFailure(message)
-
-    checkkit.require = require
-    checkkit.ok = lambda message: ok.__setitem__("message", message)
+    checkkit = fake_checkkit.build(clients, seed)
 
     botocore = types.ModuleType("botocore")
     exceptions = types.ModuleType("botocore.exceptions")
@@ -161,7 +150,7 @@ def run_verifier(
     }
     with patch.dict(sys.modules, modules):
         runpy.run_path(str(CHECKER), run_name="__main__")
-    return ok["message"]
+    return checkkit.ok_message
 
 
 class DynamoDBAutoscalingVerifierTests(unittest.TestCase):
@@ -264,6 +253,17 @@ class DynamoDBAutoscalingVerifierTests(unittest.TestCase):
     def test_unreadable_schedule_fails(self):
         with self.assertRaisesRegex(VerificationFailure, "could not read schedules"):
             run_verifier(schedules={"pin": "AccessDeniedException"})
+
+    def test_every_failure_is_reported(self):
+        with self.assertRaises(VerificationFailure) as caught:
+            run_verifier(
+                table_id="table-replacement",
+                policy_config={"TargetValue": 70.0, "DisableScaleIn": True},
+                schedules={"pin": schedule(5, 10)},
+            )
+        self.assertIn("table was deleted and recreated", str(caught.exception))
+        self.assertIn("MinCapacity=5/MaxCapacity=10", str(caught.exception))
+        self.assertIn("scale-in disabled", str(caught.exception))
 
 
 if __name__ == "__main__":

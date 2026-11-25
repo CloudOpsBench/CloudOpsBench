@@ -217,14 +217,14 @@ def compute(payload):
 
 def cmp(exp, act, path, tol):
     if isinstance(exp, bool) or isinstance(act, bool):
-        ck.require(exp == act, f"{path}: expected {exp!r}, got {act!r}")
+        ck.check(exp == act, f"{path}: expected {exp!r}, got {act!r}")
         return
     if isinstance(exp, int) and not isinstance(exp, bool):
-        ck.require(isinstance(act, (int, float)) and act == exp, f"{path}: expected {exp}, got {act!r}")
+        ck.check(isinstance(act, (int, float)) and act == exp, f"{path}: expected {exp}, got {act!r}")
         return
     if isinstance(exp, float):
-        ck.require(isinstance(act, (int, float)) and abs(act - exp) <= tol,
-                   f"{path}: expected {exp} (+/-{tol}), got {act!r}")
+        ck.check(isinstance(act, (int, float)) and abs(act - exp) <= tol,
+                 f"{path}: expected {exp} (+/-{tol}), got {act!r}")
         return
     if isinstance(exp, list):
         ck.require(isinstance(act, list) and len(act) == len(exp),
@@ -238,7 +238,7 @@ def cmp(exp, act, path, tol):
         for k in exp:
             cmp(exp[k], act[k], f"{path}.{k}", tol)
         return
-    ck.require(exp == act, f"{path}: expected {exp!r}, got {act!r}")
+    ck.check(exp == act, f"{path}: expected {exp!r}, got {act!r}")
 
 
 seed = ck.seed()
@@ -253,12 +253,12 @@ def alias_target(alias_to_check, alias_name):
     alias = sfn.describe_state_machine_alias(stateMachineAliasArn=alias_to_check)
     routing = alias.get("routingConfiguration", [])
     ck.require(len(routing) >= 1, f"the {alias_name} alias must have a routing configuration")
-    ck.require(
+    ck.check(
         len(routing) == 1 and routing[0].get("weight") == 100,
         f"the {alias_name} alias must route 100% of traffic to exactly one repaired version",
     )
     target = routing[0]["stateMachineVersionArn"]
-    ck.require(
+    ck.check(
         target != seed_version_arn,
         f"the {alias_name} alias must be repointed away from the seeded buggy version to the repaired one",
     )
@@ -267,28 +267,28 @@ def alias_target(alias_to_check, alias_name):
 
 targets = {name: alias_target(arn, name) for name, arn in alias_arns.items()}
 target_version = targets["live"]
-ck.require(
+ck.check(
     targets["audit"] != target_version,
     "the live and audit aliases must route to two distinct repaired version ARNs",
 )
 
 desc = sfn.describe_state_machine(stateMachineArn=target_version)
 audit_desc = sfn.describe_state_machine(stateMachineArn=targets["audit"])
-ck.require(
+ck.check(
     desc.get("roleArn") == seed["role_arn"],
     "the live repaired version must keep the original batch-settlement execution role",
 )
-ck.require(
+ck.check(
     audit_desc.get("roleArn") == seed["role_arn"],
     "the audit repaired version must keep the original batch-settlement execution role",
 )
 definition = json.loads(desc["definition"])
 audit_definition = json.loads(audit_desc["definition"])
-ck.require(
+ck.check(
     definition.get("QueryLanguage") == "JSONata",
     "the live repaired state machine must keep the JSONata query language",
 )
-ck.require(
+ck.check(
     audit_definition.get("QueryLanguage") == "JSONata",
     "the audit repaired state machine must keep the JSONata query language",
 )
@@ -301,7 +301,7 @@ for label, current_definition in (("live", definition), ("audit", audit_definiti
     start_at = current_definition.get("StartAt")
     start_state = states.get(start_at, {})
     terminal_states = [state for state in states.values() if state.get("End") is True]
-    ck.require(
+    ck.check(
         start_at in states
         and start_state.get("Type") == "Pass"
         and isinstance(start_state.get("Assign"), dict)
@@ -309,7 +309,7 @@ for label, current_definition in (("live", definition), ("audit", audit_definiti
         and start_state.get("Next") in states,
         f"{label}: the first Pass state must assign result and transition to the terminal state",
     )
-    ck.require(
+    ck.check(
         len(terminal_states) == 1
         and terminal_states[0].get("Type") == "Pass"
         and isinstance(terminal_states[0].get("Output"), dict),
@@ -317,7 +317,7 @@ for label, current_definition in (("live", definition), ("audit", audit_definiti
     )
 for label, current_definition in (("live", definition), ("audit", audit_definition)):
     for state_name, state in current_definition.get("States", {}).items():
-        ck.require("Resource" not in state, f"{label}.{state_name}: the repaired workflow must not invoke Lambda or other compute")
+        ck.check("Resource" not in state, f"{label}.{state_name}: the repaired workflow must not invoke Lambda or other compute")
 
 
 def run_execution(payload, label, alias_to_use, alias_name):
@@ -339,9 +339,9 @@ def check_case(payload, label, alias_to_use, alias_name):
     out = run_execution(payload, label, alias_to_use, alias_name)
     exp = compute(payload)
     label = f"{label} via {alias_name}"
-    ck.require(set(out.keys()) == set(exp.keys()),
-               f"{label}: top-level keys mismatch, expected {sorted(exp.keys())}, got {sorted(out.keys())}")
-    ck.require(out.get("batchId") == exp["batchId"], f"{label}: batchId mismatch")
+    ck.check(set(out.keys()) == set(exp.keys()),
+             f"{label}: top-level keys mismatch, expected {sorted(exp.keys())}, got {sorted(out.keys())}")
+    ck.check(out.get("batchId") == exp["batchId"], f"{label}: batchId mismatch")
     ck.require(isinstance(out.get("invoices"), list) and len(out["invoices"]) == len(exp["invoices"]),
               f"{label}: invoices must be a list of length {len(exp['invoices'])}")
     for i, (e, a) in enumerate(zip(exp["invoices"], out["invoices"])):

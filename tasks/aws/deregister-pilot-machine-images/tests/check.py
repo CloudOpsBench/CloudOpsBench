@@ -16,7 +16,7 @@ except botocore.exceptions.ClientError as e:
     if e.response["Error"]["Code"] not in ("InvalidAMIID.NotFound", "InvalidAMIID.Unavailable"):
         raise
 plain = [i for i in plain if i.get("State") != "deregistered"]
-ck.require(
+ck.check(
     not plain,
     "the image %s is still a registered image in this account — it was not retired." % AMI,
 )
@@ -31,7 +31,7 @@ while True:
     if not token:
         break
 
-ck.require(
+ck.check(
     AMI not in binned,
     "the image %s was deregistered, but a Recycle Bin retention rule caught it: it is still in this "
     "account's Recycle Bin, intact and restorable by anyone until the retention period expires — so it was "

@@ -58,9 +58,9 @@ for meta in backup.list_backup_selections(BackupPlanId=PLAN_ID)["BackupSelection
     got = backup.get_backup_selection(BackupPlanId=PLAN_ID,
                                       SelectionId=meta["SelectionId"])["BackupSelection"]
     selections.append((meta["SelectionId"], got))
-ck.require(selections,
-           f"backup plan {PLAN} has no selections at grading time, so it protects nothing; "
-           f"requirement 1 is that every fleet resource is covered by a selection on it")
+ck.check(selections,
+         f"backup plan {PLAN} has no selections at grading time, so it protects nothing; "
+         f"requirement 1 is that every fleet resource is covered by a selection on it")
 
 
 def tags_of(arn):
@@ -212,22 +212,22 @@ for arn in PROTECTED:
                 f"with {role} from selection {sid}) had still not finished {JOB_DEADLINE}s "
                 f"later at {now()}; requirement 1 is that such a job completes")
     state, message = final[arn]
-    ck.require(state == "COMPLETED",
-               f"AWS said: {message or '<no status message>'} - the backup job for "
-               f"{label(arn)} ended {state} rather than COMPLETED. Job {job_id}, started "
-               f"{at} into {VAULT} with {role}, the role on selection {sid} that matches "
-               f"this resource. Requirement 1 is that this job completes. Resource ARN: "
-               f"{arn}")
+    ck.check(state == "COMPLETED",
+             f"AWS said: {message or '<no status message>'} - the backup job for "
+             f"{label(arn)} ended {state} rather than COMPLETED. Job {job_id}, started "
+             f"{at} into {VAULT} with {role}, the role on selection {sid} that matches "
+             f"this resource. Requirement 1 is that this job completes. Resource ARN: "
+             f"{arn}")
 
 for arn in PROTECTED:
     hits, tags = matches[arn]
-    ck.require(hits,
-               f"{label(arn)} is a fleet resource and no selection on {PLAN} matches it at "
-               f"{now()}, so tonight's run backs it up not at all. Its tags are {tags or '{}'} "
-               f"and the plan's selections are "
-               f"{[{'id': sid, 'Resources': sel.get('Resources'), 'ListOfTags': sel.get('ListOfTags'), 'NotResources': sel.get('NotResources')} for sid, sel in selections]}. "
-               f"Requirement 1 is that every fleet resource except the scratch bucket is "
-               f"covered by a selection on this plan. Resource ARN: {arn}")
+    ck.check(hits,
+             f"{label(arn)} is a fleet resource and no selection on {PLAN} matches it at "
+             f"{now()}, so tonight's run backs it up not at all. Its tags are {tags or '{}'} "
+             f"and the plan's selections are "
+             f"{[{'id': sid, 'Resources': sel.get('Resources'), 'ListOfTags': sel.get('ListOfTags'), 'NotResources': sel.get('NotResources')} for sid, sel in selections]}. "
+             f"Requirement 1 is that every fleet resource except the scratch bucket is "
+             f"covered by a selection on this plan. Resource ARN: {arn}")
 
 vol_hits, vol_tags = matches[EXCLUDED]
 if vol_hits:
@@ -242,27 +242,28 @@ if vol_hits:
             backup.stop_backup_job(BackupJobId=job_id)
         except botocore.exceptions.ClientError:
             pass
-        ck.fail(f"selection {sid} on {PLAN} matches {label(EXCLUDED)} (tags {vol_tags}) and "
-                f"AWS Backup accepted a backup job for it into {VAULT} with that selection's "
-                f"role {role} at {now()} (job {job_id}, stopped again by the grader). "
-                f"Tonight's run would therefore back the scratch bucket up, which "
-                f"requirement 2 forbids. Resource ARN: {EXCLUDED}")
+        ck.check(False,
+                 f"selection {sid} on {PLAN} matches {label(EXCLUDED)} (tags {vol_tags}) and "
+                 f"AWS Backup accepted a backup job for it into {VAULT} with that selection's "
+                 f"role {role} at {now()} (job {job_id}, stopped again by the grader). "
+                 f"Tonight's run would therefore back the scratch bucket up, which "
+                 f"requirement 2 forbids. Resource ARN: {EXCLUDED}")
 
 points = []
 paginator = backup.get_paginator("list_recovery_points_by_backup_vault")
 for page in paginator.paginate(BackupVaultName=VAULT):
     points.extend(page["RecoveryPoints"])
 vol_points = [p for p in points if p.get("ResourceArn") == EXCLUDED]
-ck.require(not vol_points,
-           f"vault {VAULT} holds {len(vol_points)} recovery point(s) for "
-           f"{label(EXCLUDED)} at {now()} "
-           f"({[p['RecoveryPointArn'] for p in vol_points][:3]}); requirement 2 is that the "
-           f"scratch bucket is not backed up by {PLAN}")
+ck.check(not vol_points,
+         f"vault {VAULT} holds {len(vol_points)} recovery point(s) for "
+         f"{label(EXCLUDED)} at {now()} "
+         f"({[p['RecoveryPointArn'] for p in vol_points][:3]}); requirement 2 is that the "
+         f"scratch bucket is not backed up by {PLAN}")
 
 rule_vaults = {r.get("TargetBackupVaultName") for r in plan.get("Rules", [])}
-ck.require(VAULT in rule_vaults,
-           f"no rule on {PLAN} targets vault {VAULT} any more (rules target {rule_vaults}); "
-           f"requirement 3 is that the plan and the vault stay in place")
+ck.check(VAULT in rule_vaults,
+         f"no rule on {PLAN} targets vault {VAULT} any more (rules target {rule_vaults}); "
+         f"requirement 3 is that the plan and the vault stay in place")
 
 try:
     live_ids = {n: ddb.describe_table(TableName=n)["Table"]["TableId"]
@@ -279,18 +280,18 @@ except botocore.exceptions.ClientError as e:
             f"deleted and recreated")
 
 for name, seeded_id in s["table_ids"].items():
-    ck.require(live_ids[name] == seeded_id,
-               f"table {name} is not the one this task seeded: its id is now "
-               f"{live_ids[name]}, seeded {seeded_id}, so it was deleted and recreated "
-               f"under the same name. Requirement 3 forbids that.")
-ck.require(live_scratch == s["scratch_created"],
-           f"the bucket {s['scratch_bucket']} was created at {live_scratch}, but the one "
-           f"this task seeded was created at {s['scratch_created']}, so it was deleted and "
-           f"recreated under the same name. Requirement 3 forbids that.")
-ck.require(live_vault == s["vault_created"],
-           f"vault {VAULT} was created at {live_vault}, but the vault this task seeded "
-           f"was created at {s['vault_created']}, so it was deleted and recreated under "
-           f"the same name. Requirement 3 forbids that.")
+    ck.check(live_ids[name] == seeded_id,
+             f"table {name} is not the one this task seeded: its id is now "
+             f"{live_ids[name]}, seeded {seeded_id}, so it was deleted and recreated "
+             f"under the same name. Requirement 3 forbids that.")
+ck.check(live_scratch == s["scratch_created"],
+         f"the bucket {s['scratch_bucket']} was created at {live_scratch}, but the one "
+         f"this task seeded was created at {s['scratch_created']}, so it was deleted and "
+         f"recreated under the same name. Requirement 3 forbids that.")
+ck.check(live_vault == s["vault_created"],
+         f"vault {VAULT} was created at {live_vault}, but the vault this task seeded "
+         f"was created at {s['vault_created']}, so it was deleted and recreated under "
+         f"the same name. Requirement 3 forbids that.")
 
 done = ", ".join(f"{label(a)}={final[a][0]}" for a in PROTECTED if a in final)
 ck.ok(f"every fleet resource is covered by a selection on {PLAN} and a real backup job for "

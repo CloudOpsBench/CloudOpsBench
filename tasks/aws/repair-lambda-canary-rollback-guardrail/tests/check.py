@@ -5,8 +5,9 @@ Passes when the live alias targets only the stable version, the deployment group
 the required canary config with rollback on failure and on the seeded alarm, the alarm
 and CodeDeploy role are scoped to the live alias, and seeded resources and tags are intact.
 """
-import json, os, sys, urllib.parse
+import json, os, urllib.parse
 import boto3
+import checkkit as ck
 from botocore.exceptions import ClientError
 
 errors=[]
@@ -168,8 +169,5 @@ for label,tags in [("function",la.list_tags(Resource=c["function_arn"]).get("Tag
     wanted=expected if label != "Lambda execution role" else {"CloudOpTask":c["task_tag"],"Owner":c["owner"]}
     for k,v in wanted.items():
         if tags.get(k)!=v: fail(f"{label} tag {k} missing or changed")
-if errors:
-    print("CHECK FAILED")
-    for i,e in enumerate(errors,1): print(f"{i}. {e}")
-    sys.exit(1)
-print("CHECK PASSED")
+for e in errors: ck.check(False, e)
+ck.ok("CHECK PASSED")

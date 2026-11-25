@@ -11,7 +11,7 @@ for reg, fss in seed["filesystems"].items():
             st = "ERR:%s" % e
         if st not in ("ENABLED", "ENABLING"):
             missing.append("%s (%s): backup=%s" % (f, reg, st))
-ck.require(not missing,
+ck.check(not missing,
     "Automatic backups are not enabled on every vera2 EFS file system. Some live outside the default region "
     "and must be found by enumerating across regions. Not yet enabled: %s" % "; ".join(missing))
 ck.ok("Automatic backups enabled on all vera2 EFS file systems across all regions")

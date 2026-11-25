@@ -72,16 +72,17 @@ for item in intake:
     bus = item.get("bus") or "default"
     ev = client(region)
     desc = ev.describe_rule(Name=name, **bus_kw(bus))
+    # Stays fatal: the tag lookup below needs this rule's ARN.
     ck.require(desc.get("Name") == name, "missing intake rule")
-    ck.require((desc.get("State") or "") == "ENABLED", "an intake rule is not enabled")
+    ck.check((desc.get("State") or "") == "ENABLED", "an intake rule is not enabled")
     arn = desc.get("Arn")
-    ck.require(tags_of(ev, arn).get("App") == "intake", "an intake rule lost its App tag")
+    ck.check(tags_of(ev, arn).get("App") == "intake", "an intake rule lost its App tag")
     seen.add((region, bus, name))
 
 dev = client(decoy["region"])
 dd = dev.describe_rule(Name=decoy["name"], **bus_kw(decoy.get("bus") or "default"))
-ck.require(dd.get("Name") == decoy["name"], "decoy rule missing")
-ck.require((dd.get("State") or "") == "DISABLED", "a non-intake rule was changed")
+ck.check(dd.get("Name") == decoy["name"], "decoy rule missing")
+ck.check((dd.get("State") or "") == "DISABLED", "a non-intake rule was changed")
 
 for region in all_regions():
     ev = client(region)
@@ -105,10 +106,10 @@ for region in all_regions():
                 continue
             if tag != "intake":
                 continue
-            ck.require((r.get("State") or "") == "ENABLED", "a tagged intake rule is not enabled")
+            ck.check((r.get("State") or "") == "ENABLED", "a tagged intake rule is not enabled")
             seen.add((region, bus, name))
 
-ck.require(len(seen) >= 3, "not every tagged intake rule was found")
+ck.check(len(seen) >= 3, "not every tagged intake rule was found")
 
 for item in others:
     region = item["region"]
@@ -116,7 +117,7 @@ for item in others:
     bus = item.get("bus") or "default"
     ev = client(region)
     desc = ev.describe_rule(Name=name, **bus_kw(bus))
-    ck.require(desc.get("Name") == name, "a non-intake rule is missing")
-    ck.require((desc.get("State") or "") == (item.get("state") or ""), "a non-intake rule was changed")
+    ck.check(desc.get("Name") == name, "a non-intake rule is missing")
+    ck.check((desc.get("State") or "") == (item.get("state") or ""), "a non-intake rule was changed")
 
 ck.ok("intake rules enabled")

@@ -37,7 +37,7 @@ if remaining:
     time.sleep(6)
     remaining = present()
 
-ck.require(
+ck.check(
     not remaining,
     "Not all vera2 S3 buckets deleted. `list-buckets` omits S3 TABLE buckets (separate bucket type + service, "
     "`aws s3tables list-table-buckets`). Still present: %s" % ", ".join(remaining),

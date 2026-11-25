@@ -60,7 +60,7 @@ try:
 except Exception:
     pass
 
-ck.require(
+ck.check(
     not exposed,
     "Some vera2 resources are still shared publicly (Principal '*'). A public-access review has to include the "
     "AWS Serverless Application Repository too: `get-application` hides sharing, and only `get-application-policy` "

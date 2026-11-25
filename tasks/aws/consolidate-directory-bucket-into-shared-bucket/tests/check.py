@@ -68,12 +68,12 @@ for bucket in (source, destination, control):
     require_bucket(bucket)
 
 source_keys = object_keys(source)
-ck.require(
+ck.check(
     not source_keys,
     f"pilot directory bucket {source} still contains object(s): {source_keys[:5]}",
 )
 left_uploads = multipart_uploads(source)
-ck.require(
+ck.check(
     not left_uploads,
     "pilot directory bucket still holds an in-progress multipart upload: "
     + ", ".join(key for key, _ in left_uploads[:5]),
@@ -86,26 +86,26 @@ expected[shared_sentinel["key"]] = {
     "size": shared_sentinel["size"],
 }
 actual_keys = object_keys(destination)
-ck.require(
+ck.check(
     actual_keys == sorted(expected),
     f"shared bucket key set is wrong; expected {sorted(expected)}, found {actual_keys}",
 )
 for key, wanted in sorted(expected.items()):
     observed = evidence(destination, key)
-    ck.require(observed is not None, f"shared bucket is missing {key}")
-    ck.require(observed == wanted, f"payload integrity failed for {key}: expected {wanted}, found {observed}")
+    ck.check(observed is not None, f"shared bucket is missing {key}")
+    ck.check(observed == wanted, f"payload integrity failed for {key}: expected {wanted}, found {observed}")
 
-ck.require(
+ck.check(
     not multipart_uploads(destination),
     "shared bucket contains unfinished multipart state rather than only the completed pilot dataset",
 )
 
 control_sentinel = seed["control_sentinel"]
-ck.require(
+ck.check(
     object_keys(control) == [control_sentinel["key"]],
     f"unrelated control bucket {control} was modified",
 )
-ck.require(
+ck.check(
     evidence(control, control_sentinel["key"])
     == {"sha256": control_sentinel["sha256"], "size": control_sentinel["size"]},
     "unrelated control data changed",

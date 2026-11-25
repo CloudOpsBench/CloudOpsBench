@@ -51,22 +51,23 @@ ck.require(current is not None,
            "the secret %s in %s no longer returns a value. instruction.md requires that it "
            "hold a new signing key in a JSON object under signing_key." % (NAME, EAST))
 NEW = json_key(current, "signing_key")
-ck.require(isinstance(NEW, str) and NEW.strip(),
-           "the secret %s does not hold a signing key: its signing_key field is %s. "
-           "instruction.md requires it to keep the JSON shape with the key under "
-           "signing_key." % (NAME, "missing" if NEW is None else "empty"))
-ck.require(EXPOSED not in current,
-           "the secret %s still returns the exposed signing key as its current value. "
-           "instruction.md requires it to return a new signing key. The exposed value is "
-           "the one the secret held when the task started, readable then with a plain "
-           "get_secret_value." % NAME)
+ck.check(isinstance(NEW, str) and NEW.strip(),
+         "the secret %s does not hold a signing key: its signing_key field is %s. "
+         "instruction.md requires it to keep the JSON shape with the key under "
+         "signing_key." % (NAME, "missing" if NEW is None else "empty"))
+ck.check(EXPOSED not in current,
+         "the secret %s still returns the exposed signing key as its current value. "
+         "instruction.md requires it to return a new signing key. The exposed value is "
+         "the one the secret held when the task started, readable then with a plain "
+         "get_secret_value." % NAME)
 
 stages = sorted({st for sts in sm[EAST].describe_secret(SecretId=EAST_ARN)
                  ["VersionIdsToStages"].values() for st in sts})
 for stage in stages:
     got = secret_string(EAST_ARN, EAST, VersionStage=stage)
     if got and EXPOSED in got:
-        ck.fail(
+        ck.check(
+            False,
             "the exposed signing key is still obtainable from %s under version stage %s. "
             "instruction.md requires that no version stage on that secret return the "
             "exposed value. Replacing a secret's value moves the old version to "
@@ -113,7 +114,8 @@ def audit(what, region, listed_by, ref):
         if blob_key == NEW:
             delivered = blob_key
     if raw and EXPOSED in raw:
-        ck.fail(
+        ck.check(
+            False,
             "%s still resolves to the exposed signing key. It reads WEBHOOK_SIGNING_KEY "
             "from valueFrom %s, which resolves %s of the secret in %s, and that serves the "
             "exposed value no matter what the us-east-1 secret's current value is: a "
@@ -125,7 +127,7 @@ def audit(what, region, listed_by, ref):
             "every region, and instruction.md puts every ECS task definition family named "
             "relay-webhook-* in scope, with no region qualifier."
             % (what, ref, how, sregion, listed_by))
-    ck.require(
+    ck.check(
         isinstance(delivered, str) and delivered.strip() and delivered == NEW,
         "%s does not resolve to the same new signing key the us-east-1 secret returns. It "
         "reads WEBHOOK_SIGNING_KEY from valueFrom %s, which resolves %s of the secret in "
@@ -147,12 +149,12 @@ for region, families in ((EAST, seed["east_families"]), (WEST, seed["west_famili
                 taskDefinition=rev_arn)["taskDefinition"]
             rev_refs = [entry for c in rtd.get("containerDefinitions", [])
                         for entry in c.get("secrets", []) if entry.get("valueFrom")]
-            ck.require(rev_refs,
-                       "the active ECS revision %s in %s no longer reads the signing key "
-                       "from a secret. instruction.md requires every revision that stays "
-                       "active to resolve the same new key and to keep reading it from a "
-                       "Secrets Manager secret; deregistering a revision is the way to "
-                       "retire it." % (rev_arn.rsplit("/", 1)[1], region))
+            ck.check(rev_refs,
+                     "the active ECS revision %s in %s no longer reads the signing key "
+                     "from a secret. instruction.md requires every revision that stays "
+                     "active to resolve the same new key and to keep reading it from a "
+                     "Secrets Manager secret; deregistering a revision is the way to "
+                     "retire it." % (rev_arn.rsplit("/", 1)[1], region))
             for entry in rev_refs:
                 audit("the active ECS revision %s in %s"
                       % (rev_arn.rsplit("/", 1)[1], region),
@@ -168,12 +170,12 @@ for region, families in ((EAST, seed["east_families"]), (WEST, seed["west_famili
                 "secret." % (family, region))
         refs = [s for c in td.get("containerDefinitions", [])
                 for s in c.get("secrets", []) if s.get("valueFrom")]
-        ck.require(refs,
-                   "the latest active revision of the ECS family %s in %s (revision %s) no "
-                   "longer reads the signing key from a secret. instruction.md requires "
-                   "every workload that reads the key to keep reading it from a Secrets "
-                   "Manager secret, so dropping the reference is not a way to satisfy it."
-                   % (family, region, td.get("revision")))
+        ck.check(refs,
+                 "the latest active revision of the ECS family %s in %s (revision %s) no "
+                 "longer reads the signing key from a secret. instruction.md requires "
+                 "every workload that reads the key to keep reading it from a Secrets "
+                 "Manager secret, so dropping the reference is not a way to satisfy it."
+                 % (family, region, td.get("revision")))
         for entry in refs:
             audit("the latest active revision of the ECS family %s in %s (revision %s)"
                   % (family, region, td.get("revision")),
@@ -181,19 +183,19 @@ for region, families in ((EAST, seed["east_families"]), (WEST, seed["west_famili
                   entry["valueFrom"])
 
 other_now = secret_string(seed["other_arn"], EAST)
-ck.require(other_now is not None and seed["other_value"] in other_now,
-           "the secret %s no longer returns the value it was seeded with. instruction.md "
-           "states it belongs to the payouts team and must stay exactly as it is."
-           % seed["other_name"])
+ck.check(other_now is not None and seed["other_value"] in other_now,
+         "the secret %s no longer returns the value it was seeded with. instruction.md "
+         "states it belongs to the payouts team and must stay exactly as it is."
+         % seed["other_name"])
 other_stages = {v: sorted(s) for v, s in
                 sm[EAST].describe_secret(SecretId=seed["other_arn"])
                 ["VersionIdsToStages"].items()}
 seeded_stages = {v: sorted(s) for v, s in seed["other_stages"].items()}
-ck.require(other_stages == seeded_stages,
-           "the version stages on %s changed. instruction.md states that secret's value "
-           "and version stages must stay exactly as they are. Seeded: %s. Now: %s."
-           % (seed["other_name"], json.dumps(seeded_stages, sort_keys=True),
-              json.dumps(other_stages, sort_keys=True)))
+ck.check(other_stages == seeded_stages,
+         "the version stages on %s changed. instruction.md states that secret's value "
+         "and version stages must stay exactly as they are. Seeded: %s. Now: %s."
+         % (seed["other_name"], json.dumps(seeded_stages, sort_keys=True),
+            json.dumps(other_stages, sort_keys=True)))
 
 ck.ok("the exposed key is gone from every stage and every workload in both regions "
       "resolves the same new key")

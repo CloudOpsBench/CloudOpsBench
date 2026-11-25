@@ -117,7 +117,7 @@ if aws("kinesis", "describe-stream-summary", "--stream-name", seed["kinesis_stre
     missing.append("Kinesis stream " + seed["kinesis_stream"])
 if aws("omics", "get-sequence-store", "--id", seed["omics_store_id"]).returncode != 0:
     missing.append("HealthOmics sequence store " + seed["omics_store_id"])
-ck.require(
+ck.check(
     not missing,
     "Task-owned resources must be secured, not deleted. Problem with: " + ", ".join(missing),
 )
@@ -160,7 +160,7 @@ for _ in range(2):
     time.sleep(20)
     open_resources = scan_open()
 
-ck.require(
+ck.check(
     not open_resources,
     "These vera2 resources still grant access to a principal outside this account (a wildcard without a genuine "
     "account-scoping condition, or an external account). EVERY service that carries a resource policy must be "
@@ -168,7 +168,7 @@ ck.require(
     "S3 access policies (get-s3-access-policy). Still open: " + ", ".join(open_resources),
 )
 
-ck.require(
+ck.check(
     own_grant_present(omics_policy()),
     "The sequence store's own-account access must remain: its S3 access policy no longer grants this account. "
     "Remove only the external grant (the prompt says this account's access must be left alone).",

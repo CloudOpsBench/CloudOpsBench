@@ -21,7 +21,7 @@ for n in names:
     elif ae:
         bad.append("%s: actions still ENABLED" % n)
 
-ck.require(
+ck.check(
     not bad,
     "Not all vera2 alarms have their actions disabled. `describe-alarms` returns only metric alarms by "
     "default; composite alarms are excluded unless --alarm-types CompositeAlarm is passed. Still enabled/"

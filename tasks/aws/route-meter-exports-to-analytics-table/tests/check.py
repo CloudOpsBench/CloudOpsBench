@@ -93,7 +93,7 @@ for attempt in range(3):
         invoke_note = "invoking %s:%s raised %s" % (FN, ALIAS, exc)
     time.sleep(15)
 
-ck.require(
+ck.check(
     delivered,
     "the Lambda exporter cannot deliver at all: %s. Its live alias serves %s. instruction.md "
     "says every exporter must end up delivering into the S3 location "
@@ -261,7 +261,7 @@ for stream in sorted({served, jd_stream, glue_stream, cb_stream}):
     if not missing:
         continue  # fully authorised; skip the delivery probe
     wait = min(buffer_seconds(stream) + 60, 180)
-    ck.require(
+    ck.check(
         delivered(stream, wait),
         "the exporters now name delivery stream %r, which is configured for %s but does not "
         "deliver there. Its delivery role %s is missing %s (evaluated against its identity "
@@ -281,7 +281,7 @@ for name, snapshot in seed["stream_snapshots"].items():
     except Exception as exc:
         ck.fail("delivery stream %s is gone (%s). instruction.md says no delivery stream may "
                 "be deleted." % (name, exc))
-    ck.require(
+    ck.check(
         desc["DeliveryStreamStatus"] == "ACTIVE",
         "delivery stream %s is %s, not ACTIVE. instruction.md says no delivery stream may be "
         "deleted and none of their destination settings may be altered."
@@ -295,7 +295,7 @@ for name, snapshot in seed["stream_snapshots"].items():
         return stripped
 
     now = addressing(desc.get("Destinations", []))
-    ck.require(
+    ck.check(
         now == addressing(snapshot),
         "delivery stream %s no longer writes where it was seeded to write. Seeded: %s. Now: "
         "%s. instruction.md says no delivery stream may be pointed at a different bucket or "
@@ -314,7 +314,7 @@ def definition(table):
 
 tbl = glue.get_table(DatabaseName=DB, Name=TABLE)["Table"]
 snap = seed["table_snapshot"]
-ck.require(
+ck.check(
     definition(tbl) == definition(snap),
     "the catalog table %s.%s was modified. Seeded: %s. Now: %s. instruction.md says the "
     "interval_readings table definition must stay exactly as it is, so moving the table to "

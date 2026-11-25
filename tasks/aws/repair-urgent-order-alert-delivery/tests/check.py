@@ -33,17 +33,17 @@ try:
     )["Attributes"]
 except botocore.exceptions.ClientError:
     ck.fail("the escalation queue is gone; it must not be deleted or recreated")
-ck.require(queue_attributes.get("QueueArn") == QUEUE_ARN,
-           "the escalation queue ARN changed")
-ck.require(queue_attributes.get("CreatedTimestamp") == seed["queue_created_timestamp"],
-           "the escalation queue was deleted and recreated")
+ck.check(queue_attributes.get("QueueArn") == QUEUE_ARN,
+         "the escalation queue ARN changed")
+ck.check(queue_attributes.get("CreatedTimestamp") == seed["queue_created_timestamp"],
+         "the escalation queue was deleted and recreated")
 
 subscriptions = sns.list_subscriptions_by_topic(TopicArn=TOPIC_ARN)["Subscriptions"]
 original_subscription = [
     item for item in subscriptions
     if item.get("SubscriptionArn") == SUBSCRIPTION_ARN
 ]
-ck.require(
+ck.check(
     len(original_subscription) == 1
     and original_subscription[0].get("Protocol") == "sqs"
     and original_subscription[0].get("Endpoint") == QUEUE_ARN,
@@ -92,17 +92,17 @@ def poll_for_marker(marker, deadline_s=150):
 urgent_marker = "urgent-%s" % uuid.uuid4().hex
 publish(priority="urgent", marker=urgent_marker)
 item = poll_for_marker(urgent_marker)
-ck.require(item is not None,
-           "a fresh urgent order event was published but never reached the "
-           "escalation queue; something is still blocking delivery")
+ck.check(item is not None,
+         "a fresh urgent order event was published but never reached the "
+         "escalation queue; something is still blocking delivery")
 
 compliance_marker = "compliance-%s" % uuid.uuid4().hex
 publish(category="ComplianceAudit", marker=compliance_marker)
 item = poll_for_marker(compliance_marker)
-ck.require(item is not None,
-           "a ComplianceAudit event was published but never reached the "
-           "escalation queue; the existing compliance routing was lost or "
-           "narrowed by the fix")
+ck.check(item is not None,
+         "a ComplianceAudit event was published but never reached the "
+         "escalation queue; the existing compliance routing was lost or "
+         "narrowed by the fix")
 
 ck.ok("fulfillment-alert pipeline fully repaired: urgent events reach the "
       "escalation queue as plain JSON, and the existing ComplianceAudit "

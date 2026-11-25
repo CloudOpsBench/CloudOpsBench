@@ -9,7 +9,7 @@ R = seed["region"]
 
 ec2 = boto3.client("ec2", region_name=R)
 amis = ec2.describe_images(Owners=["self"], Filters=[{"Name": "name", "Values": ["vera2-*"]}]).get("Images", [])
-ck.require(
+ck.check(
     not amis,
     "vera2- AMIs are still registered: %s — they were not deregistered."
     % ", ".join(i["ImageId"] for i in amis),
@@ -39,7 +39,7 @@ while left and time.time() < deadline:
     time.sleep(5)
     left = list_sagemaker_images()
 
-ck.require(
+ck.check(
     not left,
     "the AMI side is clear, but the pilot's SageMaker image(s) still exist: %s. SageMaker AI keeps its own "
     "images in a separate control plane: ec2 describe-images does not return them — `sagemaker list-images` "

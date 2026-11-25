@@ -52,7 +52,7 @@ if topic:
     except Exception:
         pass
 
-ck.require(
+ck.check(
     not exposed,
     "Some vera3 resources are still shared publicly (Principal '*'). A public-access review must also cover the "
     "AWS Serverless Application Repository: `get-application` hides sharing; only `get-application-policy` "

@@ -68,6 +68,7 @@ try:
 except ClientError as e:
     errors.append("could not read schedules (%s)" % e.response.get("Error", {}).get("Code"))
 
-ck.require(not errors, "; ".join(errors))
+for error in errors:
+    ck.check(False, error)
 ck.ok("the alarm pages at threshold 100 on the right metric and no schedule will write it back — the fix "
       "will hold")

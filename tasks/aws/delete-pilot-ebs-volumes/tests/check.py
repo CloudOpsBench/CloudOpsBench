@@ -23,7 +23,7 @@ except botocore.exceptions.ClientError as e:
     if e.response["Error"]["Code"] not in ("InvalidVolume.NotFound", "InvalidVolumeID.NotFound"):
         raise
 plain = [v for v in plain if v.get("State") != "deleting"]
-ck.require(
+ck.check(
     not plain,
     "the volume %s is still an ordinary volume in this account — it was not deleted." % VOL,
 )
@@ -60,7 +60,7 @@ for _i in range(attempts):
     if _i + 1 < attempts:
         time.sleep(7)
 
-ck.require(
+ck.check(
     not captured,
     "the delete call succeeded, but a Recycle Bin retention rule caught volume %s: it is sitting in this "
     "account's Recycle Bin, intact and restorable by anyone until the retention period expires, and still "

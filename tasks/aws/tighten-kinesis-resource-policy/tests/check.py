@@ -6,6 +6,8 @@ the outsider must be denied both.
 """
 import json, os, subprocess, sys, time
 
+import checkkit as ck
+
 REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
 
 
@@ -142,8 +144,8 @@ if outsider_can_read or outsider_can_write:
 
 if not (producer_can_write and consumer_can_read
         and not outsider_can_read and not outsider_can_write):
-    fail("; ".join(problems) or "resource policy is not least-privilege")
+    for problem in problems or ["resource policy is not least-privilege"]:
+        ck.check(False, problem)
 
-print(f"OK: {stream} resource policy is least-privilege — producer can write, "
+ck.ok(f"{stream} resource policy is least-privilege — producer can write, "
       f"analytics-consumer can read, outsider denied")
-sys.exit(0)

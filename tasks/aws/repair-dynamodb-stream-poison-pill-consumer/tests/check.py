@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import concurrent.futures, hashlib, io, json, os, secrets, subprocess, sys, tempfile, time, urllib.request, uuid, zipfile
+import checkkit as ck
 
 
 def fail(msg):
@@ -74,45 +75,45 @@ S=json.load(open("seed_state.json"))
 
 src=aws_json(["dynamodb","describe-table","--table-name",S["source_table"]])["Table"]
 if src.get("TableArn") != S["source_table_arn"] or src.get("TableId") != S["source_table_id"]:
-    fail("source DynamoDB table identity changed")
+    ck.check(False, "source DynamoDB table identity changed")
 if src.get("LatestStreamArn") != S["stream_arn"]:
-    fail("source stream ARN changed; stream must be preserved in place")
+    ck.check(False, "source stream ARN changed; stream must be preserved in place")
 if src.get("KeySchema",[]) != [{"AttributeName":"event_id","KeyType":"HASH"}]:
-    fail("source table key schema changed")
+    ck.check(False, "source table key schema changed")
 ss=src.get("StreamSpecification") or {}
 if ss.get("StreamEnabled") is not True or ss.get("StreamViewType") != S["stream_view_type"]:
-    fail("source stream configuration changed; NEW_AND_OLD_IMAGES must be preserved")
+    ck.check(False, "source stream configuration changed; NEW_AND_OLD_IMAGES must be preserved")
 source_scan=aws_json(["dynamodb","scan","--table-name",S["source_table"],"--consistent-read"])
 source_items=sorted(source_scan.get("Items",[]), key=lambda x:json.dumps(x,sort_keys=True,separators=(",",":")))
 if len(source_items) != S["source_item_count"] or h(source_items) != S["source_items_sha256"]:
-    fail("source-table contents changed; live stream records must not be created for repair testing")
+    ck.check(False, "source-table contents changed; live stream records must not be created for repair testing")
 
 out=aws_json(["dynamodb","describe-table","--table-name",S["processed_table"]])["Table"]
 if out.get("TableArn") != S["processed_table_arn"] or out.get("TableId") != S["processed_table_id"]:
-    fail("processed-state DynamoDB table identity changed")
+    ck.check(False, "processed-state DynamoDB table identity changed")
 if out.get("KeySchema",[]) != [{"AttributeName":"event_id","KeyType":"HASH"}]:
-    fail("processed-state table key schema changed")
+    ck.check(False, "processed-state table key schema changed")
 
 receipt_table=aws_json(["dynamodb","describe-table","--table-name",S["receipt_table"]])["Table"]
 if receipt_table.get("TableArn") != S["receipt_table_arn"] or receipt_table.get("TableId") != S["receipt_table_id"]:
-    fail("mutation-receipt DynamoDB table identity changed")
+    ck.check(False, "mutation-receipt DynamoDB table identity changed")
 if receipt_table.get("KeySchema",[]) != [{"AttributeName":"event_id","KeyType":"HASH"},{"AttributeName":"mutation_id","KeyType":"RANGE"}]:
-    fail("mutation-receipt table key schema changed")
+    ck.check(False, "mutation-receipt table key schema changed")
 
 compat_receipts=aws_json(["dynamodb","scan","--table-name",S["receipt_table"],"--consistent-read","--filter-expression","begins_with(event_id, :p)","--expression-attribute-values",json.dumps({":p":{"S":"compat-"}})]).get("Items",[])
 compat_receipts=sorted(compat_receipts,key=lambda x:json.dumps(x,sort_keys=True,separators=(",",":")))
 if h(compat_receipts) != S["receipt_compat_sha256"]:
-    fail("frozen compat-* mutation receipt examples changed")
+    ck.check(False, "frozen compat-* mutation receipt examples changed")
 
 cfg=aws_json(["lambda","get-function-configuration","--function-name",S["function_name"]])
 if cfg.get("FunctionArn") != S["function_arn"]:
-    fail("Lambda function identity changed")
+    ck.check(False, "Lambda function identity changed")
 if h(normalized_function_config(cfg)) != S["function_config_sha256"]:
-    fail("non-code Lambda configuration changed; only the deployment package is repairable")
+    ck.check(False, "non-code Lambda configuration changed; only the deployment package is repairable")
 if h(aws_json(["lambda","get-function-concurrency","--function-name",S["function_name"]])) != S["function_concurrency_sha256"]:
-    fail("Lambda reserved-concurrency configuration changed")
+    ck.check(False, "Lambda reserved-concurrency configuration changed")
 if h(aws_json(["lambda","list-tags","--resource",S["function_arn"]]).get("Tags",{})) != S["function_tags_sha256"]:
-    fail("Lambda function tags changed")
+    ck.check(False, "Lambda function tags changed")
 versions=[]
 for v in aws_json(["lambda","list-versions-by-function","--function-name",S["function_name"]]).get("Versions",[]):
     if v.get("Version") == "$LATEST":
@@ -120,52 +121,52 @@ for v in aws_json(["lambda","list-versions-by-function","--function-name",S["fun
     versions.append({k:v.get(k) for k in ["Version","FunctionArn","CodeSha256","Description"]})
 versions.sort(key=lambda x:int(x["Version"]))
 if h(versions) != S["published_versions_sha256"]:
-    fail("published Lambda version set changed; repair $LATEST only and do not publish/delete versions")
+    ck.check(False, "published Lambda version set changed; repair $LATEST only and do not publish/delete versions")
 aliases=[{k:a.get(k) for k in ["Name","AliasArn","FunctionVersion","Description","RoutingConfig"]} for a in aws_json(["lambda","list-aliases","--function-name",S["function_name"]]).get("Aliases",[])]
 aliases.sort(key=lambda x:x["Name"])
 if h(aliases) != S["aliases_sha256"]:
-    fail("Lambda alias set/routing changed; COMPAT compatibility alias is frozen")
+    ck.check(False, "Lambda alias set/routing changed; COMPAT compatibility alias is frozen")
 
 entry_hash,asset_hash=package_snapshot(S["function_name"])
 if entry_hash != S["package_entries_sha256"] or asset_hash != S["package_assets_sha256"]:
-    fail("non-lambda_function.py deployment-package entries changed; compatibility assets are frozen")
+    ck.check(False, "non-lambda_function.py deployment-package entries changed; compatibility assets are frozen")
 
 role=aws_json(["iam","get-role","--role-name",S["role_name"]]).get("Role",{})
 if role.get("RoleId") != S["role_id"]:
-    fail("Lambda execution role identity changed")
+    ck.check(False, "Lambda execution role identity changed")
 role_state={k:role.get(k) for k in ["Arn","Path","MaxSessionDuration","PermissionsBoundary","Tags"]}
 if h(role_state) != S["role_state_sha256"]:
-    fail("Lambda execution-role non-policy state changed")
+    ck.check(False, "Lambda execution-role non-policy state changed")
 if h(role.get("AssumeRolePolicyDocument",{})) != S["role_trust_sha256"]:
-    fail("Lambda execution-role trust policy changed")
+    ck.check(False, "Lambda execution-role trust policy changed")
 inline_names=sorted(aws_json(["iam","list-role-policies","--role-name",S["role_name"]]).get("PolicyNames",[]))
 if h(inline_names) != S["role_inline_names_sha256"]:
-    fail("Lambda execution-role inline-policy set changed")
+    ck.check(False, "Lambda execution-role inline-policy set changed")
 attached=sorted(x.get("PolicyArn") for x in aws_json(["iam","list-attached-role-policies","--role-name",S["role_name"]]).get("AttachedPolicies",[]) if x.get("PolicyArn"))
 if h(attached) != S["role_attached_arns_sha256"]:
-    fail("Lambda execution-role managed-policy attachment set changed")
+    ck.check(False, "Lambda execution-role managed-policy attachment set changed")
 rp=aws_json(["iam","get-role-policy","--role-name",S["role_name"],"--policy-name",S["role_policy_name"]]).get("PolicyDocument",{})
 if h(rp) != S["role_policy_sha256"]:
-    fail("frozen Lambda execution-role inline policy changed")
+    ck.check(False, "frozen Lambda execution-role inline policy changed")
 
 if aws(["s3api","head-bucket","--bucket",S["bucket"]], check=False).returncode != 0:
     fail("preserved S3 failure-archive bucket is missing")
 tags=aws_json(["s3api","get-bucket-tagging","--bucket",S["bucket"]]).get("TagSet",[])
 if {x.get("Key"):x.get("Value") for x in tags}.get("CloudOpTask") != "ddb-stream-poison":
-    fail("preserved S3 failure-archive bucket task tag changed")
+    ck.check(False, "preserved S3 failure-archive bucket task tag changed")
 objects=[{k:o.get(k) for k in ["Key","ETag","Size","StorageClass"]} for o in aws_json(["s3api","list-objects-v2","--bucket",S["bucket"]]).get("Contents",[])]
 objects.sort(key=lambda x:x["Key"])
 if h(objects) != S["archive_objects_sha256"]:
-    fail("failure-archive object set changed; do not generate synthetic archived failures during repair testing")
+    ck.check(False, "failure-archive object set changed; do not generate synthetic archived failures during repair testing")
 
 all_maps=aws_json(["lambda","list-event-source-mappings","--function-name",S["function_name"]]).get("EventSourceMappings",[])
 if len(all_maps) != 1:
     fail(f"expected exactly one preserved event-source mapping for function, found {len(all_maps)}")
 if all_maps[0].get("UUID") != S["event_source_mapping_uuid"]:
-    fail("event-source mapping was recreated instead of repaired in place")
+    ck.check(False, "event-source mapping was recreated instead of repaired in place")
 source_maps=aws_json(["lambda","list-event-source-mappings","--event-source-arn",S["stream_arn"]]).get("EventSourceMappings",[])
 if len(source_maps) != 1 or source_maps[0].get("UUID") != S["event_source_mapping_uuid"]:
-    fail("source stream gained a replacement/additional consumer mapping")
+    ck.check(False, "source stream gained a replacement/additional consumer mapping")
 
 esm=None
 for _ in range(30):
@@ -174,34 +175,34 @@ for _ in range(30):
         break
     time.sleep(1)
 if esm.get("State") != "Enabled":
-    fail(f"event-source mapping is not Enabled (state={esm.get('State')})")
+    ck.check(False, f"event-source mapping is not Enabled (state={esm.get('State')})")
 if esm.get("EventSourceArn") != S["stream_arn"] or esm.get("FunctionArn") != S["function_arn"]:
-    fail("event-source mapping source/function changed")
+    ck.check(False, "event-source mapping source/function changed")
 if esm.get("StartingPosition") != S["starting_position"]:
-    fail("event-source mapping starting position changed")
+    ck.check(False, "event-source mapping starting position changed")
 if esm.get("BatchSize") != S["batch_size"] or esm.get("ParallelizationFactor",1) != S["parallelization_factor"]:
-    fail("event-source mapping batch size or parallelization factor changed")
+    ck.check(False, "event-source mapping batch size or parallelization factor changed")
 if esm.get("MaximumBatchingWindowInSeconds",0) != S["maximum_batching_window"]:
-    fail("event-source mapping batching window changed")
+    ck.check(False, "event-source mapping batching window changed")
 if esm.get("TumblingWindowInSeconds",0) != S["tumbling_window"]:
-    fail("event-source mapping tumbling-window setting changed")
+    ck.check(False, "event-source mapping tumbling-window setting changed")
 if h(esm.get("FilterCriteria") or {}) != S["filter_criteria_sha256"]:
-    fail("event-source mapping FilterCriteria changed; poison records must not be hidden by filtering")
+    ck.check(False, "event-source mapping FilterCriteria changed; poison records must not be hidden by filtering")
 drop={"UUID","LastModified","LastProcessingResult","State","StateTransitionReason","DestinationConfig","MaximumRecordAgeInSeconds","BisectBatchOnFunctionError","MaximumRetryAttempts","FunctionResponseTypes"}
 esm_static={k:v for k,v in esm.items() if k not in drop}
 if h(esm_static) != S["event_source_static_sha256"]:
-    fail("a frozen event-source mapping field changed (including scaling/poller/static settings)")
+    ck.check(False, "a frozen event-source mapping field changed (including scaling/poller/static settings)")
 if "ReportBatchItemFailures" not in (esm.get("FunctionResponseTypes") or []):
-    fail("ReportBatchItemFailures is not enabled")
+    ck.check(False, "ReportBatchItemFailures is not enabled")
 if esm.get("BisectBatchOnFunctionError") is not True:
-    fail("BisectBatchOnFunctionError must be enabled")
+    ck.check(False, "BisectBatchOnFunctionError must be enabled")
 if esm.get("MaximumRetryAttempts") != 2:
-    fail(f"MaximumRetryAttempts must be exactly 2, got {esm.get('MaximumRetryAttempts')}")
+    ck.check(False, f"MaximumRetryAttempts must be exactly 2, got {esm.get('MaximumRetryAttempts')}")
 if esm.get("MaximumRecordAgeInSeconds") != 3600:
-    fail(f"MaximumRecordAgeInSeconds must be exactly 3600, got {esm.get('MaximumRecordAgeInSeconds')}")
+    ck.check(False, f"MaximumRecordAgeInSeconds must be exactly 3600, got {esm.get('MaximumRecordAgeInSeconds')}")
 dest=((esm.get("DestinationConfig") or {}).get("OnFailure") or {}).get("Destination")
 if dest != S["bucket_arn"]:
-    fail("OnFailure destination must be the preserved S3 full-payload archive bucket")
+    ck.check(False, "OnFailure destination must be the preserved S3 full-payload archive bucket")
 
 for _ in range(30):
     cfg=aws_json(["lambda","get-function-configuration","--function-name",S["function_name"]])
@@ -289,12 +290,12 @@ def expect_receipt(event_id,kind,revision,seq,payload=None):
     want=expected_receipt(event_id,kind,revision,seq,payload)
     got=get_receipt(event_id,kind,revision,seq)
     if got != want:
-        fail(f"mutation receipt mismatch for {event_id} {kind} rev{revision}: expected {want}, got {got}")
+        ck.check(False, f"mutation receipt mismatch for {event_id} {kind} rev{revision}: expected {want}, got {got}")
 
 
 def expect_no_receipt(event_id,kind,revision,seq):
     if get_receipt(event_id,kind,revision,seq) is not None:
-        fail(f"failed/stale mutation unexpectedly wrote a receipt for {event_id} {kind} rev{revision}")
+        ck.check(False, f"failed/stale mutation unexpectedly wrote a receipt for {event_id} {kind} rev{revision}")
 
 
 def put_started(event_id,payload,revision,seq):
@@ -347,7 +348,7 @@ def invoke_expect_error(records):
     except Exception as exc:
         fail(str(exc))
     if not meta.get("FunctionError"):
-        fail(f"unidentifiable failed record must fail the whole invocation, got {body}")
+        ck.check(False, f"unidentifiable failed record must fail the whole invocation, got {body}")
 
 
 def failure_ids(body):
@@ -357,7 +358,7 @@ def failure_ids(body):
             fail(f"invalid batchItemFailures entry: {x}")
         vals.append(x["itemIdentifier"])
     if len(vals) != len(set(vals)):
-        fail(f"batchItemFailures contains duplicate identifiers: {vals}")
+        ck.check(False, f"batchItemFailures contains duplicate identifiers: {vals}")
     return set(vals)
 
 
@@ -365,7 +366,7 @@ def expect_failures(body,*ids):
     got=failure_ids(body)
     want=set(map(str,ids))
     if got != want:
-        fail(f"expected failure SequenceNumbers {sorted(want)}, got {sorted(got)}")
+        ck.check(False, f"expected failure SequenceNumbers {sorted(want)}, got {sorted(got)}")
 
 
 def canonical_live(item,event_id,payload,revision,seq):
@@ -374,7 +375,7 @@ def canonical_live(item,event_id,payload,revision,seq):
       "revision":{"N":str(revision)},"sequence_number":{"S":str(seq)}
     }
     if item != expected:
-        fail(f"live state for {event_id} is not exact canonical shape: expected {expected}, got {item}")
+        ck.check(False, f"live state for {event_id} is not exact canonical shape: expected {expected}, got {item}")
 
 
 def canonical_deleted(item,event_id,revision,seq):
@@ -383,7 +384,7 @@ def canonical_deleted(item,event_id,revision,seq):
       "revision":{"N":str(revision)},"sequence_number":{"S":str(seq)}
     }
     if item != expected:
-        fail(f"deleted state for {event_id} is not exact tombstone shape: expected {expected}, got {item}")
+        ck.check(False, f"deleted state for {event_id} is not exact tombstone shape: expected {expected}, got {item}")
 
 
 compat_id=f"compat-{uuid.uuid4().hex[:12]}"
@@ -393,7 +394,7 @@ try:
 except Exception as exc:
     fail(str(exc))
 if meta.get("FunctionError"):
-    fail(f"compat-v1 behavior regressed: {compat_body}")
+    ck.check(False, f"compat-v1 behavior regressed: {compat_body}")
 canon=json.dumps(compat_values,sort_keys=True,separators=(",",":"))
 expected_compat={
     "contract":"compat-v1",
@@ -402,7 +403,7 @@ expected_compat={
     "digest":hashlib.sha256(("jc-ddb-compat-2026|"+canon).encode()).hexdigest(),
 }
 if compat_body != expected_compat:
-    fail(f"compat-v1 behavior changed: expected {expected_compat}, got {compat_body}")
+    ck.check(False, f"compat-v1 behavior changed: expected {expected_compat}, got {compat_body}")
 
 
 tag=uuid.uuid4().hex[:10]
@@ -426,7 +427,7 @@ put_started(marker_bad,"marker-bad",1,seq(41))
 rm2=invoke([rec_upsert(marker_bad,"marker-bad",1,True,seq(41),name="INSERT")])
 expect_failures(rm2,seq(41))
 if get_item(marker_bad) is not None:
-    fail("exact poison retry left the legacy started marker in processed state")
+    ck.check(False, "exact poison retry left the legacy started marker in processed state")
 expect_no_receipt(marker_bad,"live",1,seq(41))
 
 marker_late=f"grader-{tag}-marker-late"
@@ -456,14 +457,14 @@ expect_receipt(entity,"live",3,seq(3),"v3")
 expect_receipt(other,"live",1,seq(5),"other-v1")
 expect_no_receipt(entity,"live",2,seq(2))
 if get_item(poison_only) is not None:
-    fail("standalone poison record left processed/idempotency state")
+    ck.check(False, "standalone poison record left processed/idempotency state")
 
 # Replaying the whole batch changes nothing and poison stays failed.
 before_entity=get_item(entity); before_other=get_item(other)
 r2=invoke(batch1)
 expect_failures(r2,seq(2),seq(4))
 if get_item(entity) != before_entity or get_item(other) != before_other or get_item(poison_only) is not None:
-    fail("checkpoint replay changed materialized state")
+    ck.check(False, "checkpoint replay changed materialized state")
 
 # Equal live order with different content/sequence is a conflict.
 same_live=rec_upsert(entity,"v3-CONFLICT",3,False,seq(6),old=("v2-bad",2,True))
@@ -566,9 +567,9 @@ bad_receipt=expected_receipt(blocked,"live",7,blocked_seq,"WRONG")
 put_receipt_raw(bad_receipt)
 br=invoke([rec_upsert(blocked,"right",7,False,blocked_seq,name="INSERT")]); expect_failures(br,blocked_seq)
 if get_item(blocked) is not None:
-    fail("projection advanced even though immutable receipt key was already conflicting; state/receipt were not atomic")
+    ck.check(False, "projection advanced even though immutable receipt key was already conflicting; state/receipt were not atomic")
 if get_receipt(blocked,"live",7,blocked_seq) != bad_receipt:
-    fail("conflicting immutable receipt was overwritten")
+    ck.check(False, "conflicting immutable receipt was overwritten")
 
 def concurrent_calls(payloads):
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(payloads)) as ex:
@@ -607,7 +608,7 @@ live21=rec_upsert(race2,"live21",21,False,seq(32),name="INSERT")
 del21=rec_remove(race2,"live21",21,seq(33))
 rr2=concurrent_calls([[live21],[del21]])
 if any(failure_ids(x) for x in rr2):
-    fail("same-revision live/REMOVE overlap should converge successfully with REMOVE winning")
+    ck.check(False, "same-revision live/REMOVE overlap should converge successfully with REMOVE winning")
 canonical_deleted(get_item(race2),race2,21,seq(33))
 expect_receipt(race2,"delete",21,seq(33))
 
@@ -617,7 +618,7 @@ low=rec_upsert(race3,"low",30,False,seq(34),name="INSERT")
 high=rec_upsert(race3,"high",31,False,seq(35),name="INSERT")
 rr3=concurrent_calls([[low],[high]])
 if any(failure_ids(x) for x in rr3):
-    fail("different-revision overlap should converge without a conflict")
+    ck.check(False, "different-revision overlap should converge without a conflict")
 canonical_live(get_item(race3),race3,"high",31,seq(35))
 expect_receipt(race3,"live",31,seq(35),"high")
 
@@ -636,7 +637,7 @@ expect_receipt(txb,"live",41,seq(61),"tx-b")
 before_txa=get_item(txa); before_txb=get_item(txb)
 tg2=invoke([txa_rec,txb_rec]); expect_failures(tg2)
 if get_item(txa)!=before_txa or get_item(txb)!=before_txb:
-    fail("successful transaction-envelope replay changed projection state")
+    ck.check(False, "successful transaction-envelope replay changed projection state")
 
 # Poison in one member aborts the whole group, including the good member.
 txid2=f"tx-{tag}-poison"
@@ -646,7 +647,7 @@ good_member=rec_upsert(txc,"would-have-been-good",50,False,seq(62),name="INSERT"
 bad_member=rec_upsert(txd,"poison",1,True,seq(63),name="INSERT",tx=(txid2,1,2))
 tg3=invoke([good_member,bad_member]); expect_failures(tg3,seq(62),seq(63))
 if get_item(txc) is not None or get_item(txd) is not None:
-    fail("poisoned transaction envelope partially changed projection state")
+    ck.check(False, "poisoned transaction envelope partially changed projection state")
 expect_no_receipt(txc,"live",50,seq(62)); expect_no_receipt(txd,"live",1,seq(63))
 
 # A receipt conflict on one member aborts the whole group.
@@ -660,10 +661,10 @@ e_rec=rec_upsert(txe,"clean-neighbour",60,False,seqe,name="INSERT",tx=(txid3,0,2
 f_rec=rec_upsert(txf,"right",61,False,seqf,name="INSERT",tx=(txid3,1,2))
 tg4=invoke([e_rec,f_rec]); expect_failures(tg4,seqe,seqf)
 if get_item(txe) is not None or get_item(txf) is not None:
-    fail("transaction group leaked projection state around an immutable receipt conflict")
+    ck.check(False, "transaction group leaked projection state around an immutable receipt conflict")
 expect_no_receipt(txe,"live",60,seqe)
 if get_receipt(txf,"live",61,seqf) != conflicting:
-    fail("transaction group overwrote its pre-existing conflicting receipt")
+    ck.check(False, "transaction group overwrote its pre-existing conflicting receipt")
 
 # An incomplete envelope fails and is not processed as a standalone record.
 txid4=f"tx-{tag}-incomplete"
@@ -671,7 +672,7 @@ txg=f"grader-{tag}-tx-g"; delete_item(txg)
 incomplete=rec_upsert(txg,"incomplete",70,False,seq(66),name="INSERT",tx=(txid4,0,2))
 tg5=invoke([incomplete]); expect_failures(tg5,seq(66))
 if get_item(txg) is not None:
-    fail("incomplete transaction envelope was processed as a standalone mutation")
+    ck.check(False, "incomplete transaction envelope was processed as a standalone mutation")
 expect_no_receipt(txg,"live",70,seq(66))
 
 
@@ -679,17 +680,17 @@ expect_no_receipt(txg,"live",70,seq(66))
 source_scan=aws_json(["dynamodb","scan","--table-name",S["source_table"],"--consistent-read"])
 source_items=sorted(source_scan.get("Items",[]), key=lambda x:json.dumps(x,sort_keys=True,separators=(",",":")))
 if len(source_items) != S["source_item_count"] or h(source_items) != S["source_items_sha256"]:
-    fail("source-table contents changed during repair/testing")
+    ck.check(False, "source-table contents changed during repair/testing")
 objects=[{k:o.get(k) for k in ["Key","ETag","Size","StorageClass"]} for o in aws_json(["s3api","list-objects-v2","--bucket",S["bucket"]]).get("Contents",[])]
 objects.sort(key=lambda x:x["Key"])
 if h(objects) != S["archive_objects_sha256"]:
-    fail("failure-archive object set changed during repair/testing")
+    ck.check(False, "failure-archive object set changed during repair/testing")
 entry_hash,asset_hash=package_snapshot(S["function_name"])
 if entry_hash != S["package_entries_sha256"] or asset_hash != S["package_assets_sha256"]:
-    fail("compatibility deployment-package assets changed during repair")
+    ck.check(False, "compatibility deployment-package assets changed during repair")
 compat_receipts=aws_json(["dynamodb","scan","--table-name",S["receipt_table"],"--consistent-read","--filter-expression","begins_with(event_id, :p)","--expression-attribute-values",json.dumps({":p":{"S":"compat-"}})]).get("Items",[])
 compat_receipts=sorted(compat_receipts,key=lambda x:json.dumps(x,sort_keys=True,separators=(",",":")))
 if h(compat_receipts) != S["receipt_compat_sha256"]:
-    fail("frozen compat-* mutation receipt examples changed during repair/testing")
+    ck.check(False, "frozen compat-* mutation receipt examples changed during repair/testing")
 
-print("PASS: stream projection and immutable receipts are atomic, monotone, fail-closed, and compatibility-preserving")
+ck.ok("stream projection and immutable receipts are atomic, monotone, fail-closed, and compatibility-preserving")

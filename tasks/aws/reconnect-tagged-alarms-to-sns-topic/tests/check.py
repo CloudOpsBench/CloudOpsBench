@@ -162,26 +162,26 @@ for item in seed.get("topics") or []:
         live = True
     except Exception:
         live = False
-    ck.require(live, "the tagged topic is missing")
-    ck.require(sns_tags(region, arn).get("App") == "nightbell", "the tagged topic lost its App tag")
+    ck.check(live, "the tagged topic is missing")
+    ck.check(sns_tags(region, arn).get("App") == "nightbell", "the tagged topic lost its App tag")
 
 topics = tagged_topics()
-ck.require(topics, "the tagged topic is missing")
+ck.check(topics, "the tagged topic is missing")
 
 for item in seed["nightbell"]:
     region = item.get("region") or home
     want = item.get("topic") or ((topics.get(region) or [None])[0])
     a = get_named(region, item["name"], item["type"])
-    ck.require(a.get("AlarmName") == item["name"], "a tagged alarm is missing")
-    ck.require(want in (a.get("AlarmActions") or []), "a tagged alarm still has no notify action")
-    ck.require(tags_of(region, a.get("AlarmArn")).get("App") == "nightbell", "a tagged alarm lost its App tag")
+    ck.check(a.get("AlarmName") == item["name"], "a tagged alarm is missing")
+    ck.check(want in (a.get("AlarmActions") or []), "a tagged alarm still has no notify action")
+    ck.check(tags_of(region, a.get("AlarmArn")).get("App") == "nightbell", "a tagged alarm lost its App tag")
 
 decoy = seed["decoy"]
 decoy_region = decoy.get("region") or home
 a = get_named(decoy_region, decoy["name"], decoy["type"])
-ck.require(a.get("AlarmName") == decoy["name"], "an untagged alarm is missing")
-ck.require(config_of(a, decoy["type"]) == decoy.get("config"), "an untagged alarm was changed")
-ck.require(tags_of(decoy_region, a.get("AlarmArn")) == (decoy.get("tags") or {"App": "drill"}), "an untagged alarm was retagged")
+ck.check(a.get("AlarmName") == decoy["name"], "an untagged alarm is missing")
+ck.check(config_of(a, decoy["type"]) == decoy.get("config"), "an untagged alarm was changed")
+ck.check(tags_of(decoy_region, a.get("AlarmArn")) == (decoy.get("tags") or {"App": "drill"}), "an untagged alarm was retagged")
 
 seen = set()
 for region in all_regions():
@@ -191,17 +191,17 @@ for region in all_regions():
             if tags_of(region, a.get("AlarmArn")).get("App") != "nightbell":
                 continue
             actions = a.get("AlarmActions") or []
-            ck.require(any(t in actions for t in regional), "a tagged alarm still has no notify action")
+            ck.check(any(t in actions for t in regional), "a tagged alarm still has no notify action")
             seen.add((region, a.get("AlarmName")))
 
-ck.require(len(seen) >= 3, "not every tagged alarm was found")
+ck.check(len(seen) >= 3, "not every tagged alarm was found")
 
 for other in seed.get("others") or []:
     region = other.get("region") or home
     a = get_named(region, other["name"], other["type"])
-    ck.require(a.get("AlarmName") == other.get("name"), "an unrelated alarm is missing")
-    ck.require(config_of(a, other["type"]) == other.get("config"), "an unrelated alarm was changed")
+    ck.check(a.get("AlarmName") == other.get("name"), "an unrelated alarm is missing")
+    ck.check(config_of(a, other["type"]) == other.get("config"), "an unrelated alarm was changed")
     if other.get("tags") is not None:
-        ck.require(tags_of(region, a.get("AlarmArn")) == other.get("tags"), "an unrelated alarm was retagged")
+        ck.check(tags_of(region, a.get("AlarmArn")) == other.get("tags"), "an unrelated alarm was retagged")
 
 ck.ok("nightbell notify")
